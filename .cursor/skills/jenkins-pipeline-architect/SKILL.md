@@ -19,11 +19,95 @@ You are an expert in Jenkins Scripted Pipelines and DevSecOps.
 - Use for loops in CPS context; use .each only inside @NonCPS methods
 - Pass data between CPS and @NonCPS via serializable types only (String, Map, List, primitives)
 
+## Groovy/CPS Pitfalls
+
+### Underscore Variable Scoping
+
+Error: `The current scope already contains a variable of the name _`
+
+`_` is reserved in Jenkins pipeline scope (used by `@Library` import). Use descriptive names in closures.
+
+Bad:
+```groovy
+buildResults.count { _, result -> result.result == 'SUCCESS' }
+```
+
+Good:
+```groovy
+buildResults.count { k, result -> result.result == 'SUCCESS' }
+```
+
+### Division Returns BigDecimal
+
+Error: `No signature of method ... applicable for argument types: (BigDecimal)` when method expects `long`
+
+Groovy `/` operator returns `BigDecimal` even when both operands are `long`. Use explicit cast.
+
+Bad:
+```groovy
+def durationSeconds = (endTime.time - startTime.time) / 1000
+```
+
+Good:
+```groovy
+def durationSeconds = (long)((endTime.time - startTime.time) / 1000)
+```
+
+### NoSuchMethodError in vars/ Files
+
+Error: `No such DSL method 'methodName' found among steps`
+
+Typed optional parameters in `vars/` file methods break Jenkins method resolution. Remove type declarations and default values.
+
+Bad:
+```groovy
+def completion(def jclient, String issueKey, Map results, long duration, Map summary = null)
+```
+
+Good:
+```groovy
+def completion(jclient, issueKey, results, duration, summary)
+```
+
 ## Console Output
 - Build multi-line output as a single string, print with one println call
 - Never use multiple println/echo calls for multi-line reports (adds [Pipeline] echo noise per line)
 - Remove progress echo statements unless specifically needed for debugging
 - Use String.format() for column alignment (sprintf is not whitelisted in sandbox)
+
+## Structured Logging
+
+- Use structured format: `[LEVEL] message | key1=value1, key2=value2`
+- Five levels: DEBUG, INFO, WARNING, ERROR, SUCCESS
+- Persistent context via `setContext(Map)` / `addContext(Map)` — persists across calls
+- Per-call context via method parameter — merged with persistent context at output time
+- Temporary context scope via `withContext(Map, Closure)` — auto-restores after block
+- Singleton logger per pipeline via binding variable
+
+```groovy
+private void log(String level, String message, Map additionalContext = [:]) {
+    def allContext = [:]
+    allContext.putAll(this.context)
+    allContext.putAll(additionalContext)
+
+    def output = "[${level}] ${message}"
+    if (allContext) {
+        def contextStr = allContext.collect { k, v -> "${k}=${v}" }.join(', ')
+        output += " | ${contextStr}"
+    }
+    script.println output
+}
+
+def withContext(Map temporaryContext, Closure action) {
+    def originalContext = new HashMap(this.context)
+    try {
+        addContext(temporaryContext)
+        return action()
+    } finally {
+        this.context = originalContext
+    }
+}
+```
 
 ## AWS SDK Integration
 - Use @Grab for dependency management (requires sandbox disabled in job config)
@@ -273,6 +357,78 @@ Key differences:
 - Referenced parameter access requires try-catch with binding fallback
 - Sandbox mode often needs to be false for parameter access
 - Always validate referenced parameter is not null/empty before use
+
+### DynamicReferenceParameter (HTML Output)
+
+For parameters that render raw HTML/CSS/JavaScript in the Jenkins build form:
+
+```groovy
+[$class: 'org.biouno.unochoice.DynamicReferenceParameter',
+    choiceType: 'ET_FORMATTED_HTML',
+    name: 'DISPLAY_PANEL',
+    description: 'Dynamic HTML Display',
+    referencedParameters: 'CONFIG,APPLICATION,OPERATION',
+    script: [
+        $class: 'org.biouno.unochoice.model.GroovyScript',
+        fallbackScript: [classpath: [], sandbox: false, script: 'return ""'],
+        script: [
+            classpath: [],
+            sandbox: false,
+            script: '''
+                def config = CONFIG
+                def operation = OPERATION
+                if (!operation || operation != 'VIEW') { return "" }
+
+                def html = "<div style='padding:10px;'>"
+                html += "<input type='hidden' name='value' id='formData'/>"
+                html += "</div>"
+                return html
+            '''
+        ]
+    ]
+]
+```
+
+Key differences from ChoiceParameter/CascadeChoiceParameter:
+- Class: `org.biouno.unochoice.DynamicReferenceParameter`
+- `choiceType: 'ET_FORMATTED_HTML'` renders raw HTML (not a select dropdown)
+- Hidden `<input name='value'>` passes data back to `params.DISPLAY_PANEL`
+- Return empty string `""` when parameter should not render (conditional display)
+- Can contain `<style>`, `<script>`, and full HTML markup
+
+## JavaScript in Active Choice Parameters
+
+- Use `createElement`/`appendChild` instead of `innerHTML` for dynamic DOM elements
+- Use IIFE `(function(){...})();` for inline `onclick` handlers
+- Use `&quot;` for double quotes inside onclick attribute strings
+- Use `String.fromCharCode()` to encode complex selectors and avoid nested quote conflicts
+- Use `window.functionName` to expose functions to global scope
+- Assign handlers directly: `btn.onclick = function(){}` when using `createElement`
+- Use `setInterval(window.collectFormData, 1000)` for continuous form data collection into hidden inputs
+- Place `<script>` blocks after the HTML elements they reference
+- Use `setTimeout(function(){...}, 100)` in `onchange` handlers to wait for DOM updates
+
+IIFE onclick pattern:
+```groovy
+def removeCode = "(function(){var e=document.getElementById(&quot;item_${idx}&quot;);if(e)e.remove();})();"
+html += "<button onclick='${removeCode}'>Remove</button>"
+```
+
+createElement pattern:
+```groovy
+html += "var btn=document.createElement(&quot;button&quot;);"
+html += "btn.onclick=function(){d.remove();};"
+html += "d.appendChild(btn);"
+```
+
+Data collection with setInterval:
+```groovy
+html += "window.collectFormData = function() {"
+html += "  var data = {};"
+html += "  document.getElementById('formData').value = JSON.stringify(data);"
+html += "};"
+html += "setInterval(window.collectFormData, 1000);"
+```
 
 ## Environment Detection from Job Names
 
@@ -615,4 +771,232 @@ Key points:
 Authentication (if required):
 ```groovy
 connection.setRequestProperty("Authorization", "Bearer ${ARTIFACTORY_TOKEN}")
+```
+
+## Error Handling Patterns
+
+- Wrap all pipeline stages in a global try-catch
+- Always re-throw the exception in catch block: `throw e`
+- Use nested try-catch inside catch blocks for critical cleanup (e.g., JIRA status update)
+- Never filter exception types — handle all exceptions including `AbortException` (user cancellation)
+- Use `validateAndFail` DSL: check condition → post error notification → throw error
+- `withRetry` configurable parameters:
+  - `maxAttempts` (default 3) — maximum retry attempts
+  - `delaySeconds` (default 5) — delay between retries
+  - `exponentialBackoff` (default false) — formula: `delay * 2^(attempt-1)`
+  - `retryOn` (default `[Exception]`) — exception types to retry on
+  - `onRetry` — optional callback receiving `(attempt, exception)`
+
+```groovy
+try {
+    validateAndFail(jclient, issueKey, !issueData.version, "No version specified")
+
+    stage('Deploy') {
+        buildResults = triggerDeployments.sequential(targets, jenkinsInstance)
+    }
+} catch (Exception e) {
+    if (issueKey && jclient) {
+        try {
+            withRetry(maxAttempts: 2, delaySeconds: 3) {
+                jclient.setIssueStatus(issueKey, 'FAIL', null)
+            }
+        } catch (Exception statusError) {
+            echo "Failed to update status: ${statusError.message}"
+        }
+        postJiraComment.error(jclient, issueKey, e.message, e)
+    }
+    throw e
+}
+```
+
+## JIRA Notification Patterns
+
+- Four notification types: `start()`, `completion()`, `error()`, `artifact()`
+- Post start notification before deployment trigger (shows intent, not result)
+- Post completion notification with build results map and duration
+- Post error notification in catch block — always post regardless of exception type
+- Post artifact notification per-component after downloading build artifacts
+- Wrap JIRA status updates in `withRetry` (API can be flaky)
+- Set JIRA status to SUCCESS with resolution or FAIL without resolution
+
+```groovy
+postJiraComment.start(jclient, issueKey, application, deploymentTargets)
+
+buildResults = application.sequential_deployment ?
+    triggerDeployments.sequential(targets, jenkinsInstance) :
+    triggerDeployments.parallel(targets, jenkinsInstance)
+
+def failedBuilds = buildResults.findAll { k, result -> result.result != 'SUCCESS' }
+def status = failedBuilds.isEmpty() ? 'SUCCESS' : 'FAIL'
+def resolution = failedBuilds.isEmpty() ? 'Done' : null
+
+withRetry(maxAttempts: 2, delaySeconds: 3) {
+    jclient.setIssueStatus(issueKey, status, resolution)
+}
+
+postJiraComment.completion(jclient, issueKey, buildResults, endTime, durationSeconds, artifactSummaries)
+```
+
+## Deployment Execution
+
+- Use `propagate: false` on triggered builds for independent failure handling
+- Set `wait: true` to collect build results
+- Always set timeout: `timeout: [time: 120, unit: 'MINUTES']`
+- Choose sequential or parallel based on application config flag
+- For artifact download: `curl -s -f -k -u` with `withCredentials`
+- `-k` bypasses SSL certificate issues, `-u` provides Jenkins authentication
+- URL pattern: `buildUrl + "artifact/" + artifactFilename`
+- Return null on download failure (graceful degradation)
+
+Build trigger:
+```groovy
+def result = build(
+    job: jobName,
+    parameters: buildParams,
+    propagate: false,
+    wait: true,
+    timeout: [time: 120, unit: 'MINUTES']
+)
+```
+
+Artifact download:
+```groovy
+def artifactUrl = "${buildUrl}artifact/${artifactFilename}"
+withCredentials([usernamePassword(credentialsId: credId, usernameVariable: 'JENKINS_USER', passwordVariable: 'JENKINS_TOKEN')]) {
+    content = sh(script: "curl -s -f -k -u \${JENKINS_USER}:\${JENKINS_TOKEN} '${artifactUrl}'", returnStdout: true).trim()
+}
+```
+
+## JSON Configuration CRUD via Pipeline
+
+- Use Active Choice parameters to load and display JSON configuration in build form
+- Four operations: VIEW (read-only display), MODIFY (editable form), ADD (new entries), DELETE (removal)
+- Parse JSON once in parameter script, pass as hidden input to pipeline
+- For MODIFY: use `setInterval` to continuously collect form data into hidden input
+- Save results with `writeFile` + `archiveArtifacts` (manual git commit step)
+- Use `readJSON text:` to parse parameter values in pipeline stages
+- Auto-increment IDs: `json.applications.collect { it.id }.max() + 1`
+- Always validate operation parameter before processing
+
+```groovy
+def jsonText = params.CONFIG
+def json = readJSON text: jsonText
+
+if (operation == 'DELETE') {
+    def appIndex = json.applications.findIndexOf { it.id == appId }
+    json.applications.remove(appIndex)
+}
+
+def updatedJson = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(json))
+writeFile file: 'ApplicationMap_updated.json', text: updatedJson
+archiveArtifacts artifacts: 'ApplicationMap_updated.json', fingerprint: true
+```
+
+## Boolean Parameter Filtering
+
+- When all component parameters have `valuetype == 'boolean'`, check if any value is true
+- Skip components where all boolean values are false (nothing to deploy)
+- Use `return` to skip inside closures (not `continue`)
+- Case-insensitive comparison: `value.toLowerCase() == 'true'`
+
+```groovy
+def allBoolean = parameterKeys.every { paramKey ->
+    envConfig.parameters[paramKey].valuetype == 'boolean'
+}
+
+if (allBoolean) {
+    def anyTrue = manifestValues.any { value ->
+        value.toLowerCase() == 'true'
+    }
+    if (!anyTrue) {
+        return
+    }
+}
+```
+
+## HTTP API Patterns
+
+### Standardized Response Map
+
+All API methods return a consistent response structure:
+
+```groovy
+[
+    success: true,
+    code: 200,
+    data: responseData,
+    message: "Request successful"
+]
+```
+
+### curl-based API Calls
+
+- Use curl with `-s` (silent), `-f` (fail on HTTP errors), `-k` (ignore SSL), `-w "\\n%{http_code}"` (append status code)
+- Set `--connect-timeout 10` and `--max-time 30`
+- Parse response: body on all lines except last, HTTP code on last line
+- Switch on HTTP codes: 200/201/204 success, 401 auth failed, 403 forbidden, 404 not found, 5xx server error
+- Bearer token: `-H "Authorization: Bearer ${token}"`
+
+```groovy
+def curlCmd = [
+    "curl", "-s", "-w", "\\n%{http_code}",
+    "-X", method,
+    "-H", "Content-Type: application/json",
+    "-H", "Authorization: Bearer ${token}",
+    "--connect-timeout", "10",
+    "--max-time", "30"
+]
+if (data) { curlCmd.addAll(["-d", JsonOutput.toJson(data)]) }
+curlCmd.add(url)
+
+def process = curlCmd.execute()
+def output = process.text
+def exitCode = process.waitFor()
+```
+
+### CLI/Process-based API Calls
+
+- Use `['bash', '-c', cmd].execute()` for CLI tools (e.g., `gh api`)
+- `consumeProcessOutput(stdout, stderr)` for non-blocking output capture
+- `waitForOrKill(timeout)` kills process if it exceeds timeout
+- Use `set -o pipefail` in shell scripts for pipeline error propagation
+- Extract HTTP code from stderr, body from stdout
+- Fallback HTTP code detection from error strings ("Not Found" → 404, "Unauthorized" → 401)
+- All Process/IO methods must be `@NonCPS`
+
+```groovy
+def process = ['bash', '-c', cmd].execute()
+def stdout = new StringBuilder()
+def stderr = new StringBuilder()
+process.consumeProcessOutput(stdout, stderr)
+
+process.waitForOrKill(30000)
+def exitCode = process.exitValue()
+def httpCode = stderr.toString().trim().isNumber() ? stderr.toString().trim().toInteger() : 500
+def isSuccess = (httpCode >= 200 && httpCode < 300)
+```
+
+### Async Polling with Timeout
+
+- Use `while (System.currentTimeMillis() < timeoutTimestamp)` loop
+- Track state changes with timestamps for observability
+- Return 408 (Request Timeout) on timeout
+- Sleep interval between polls
+- Trigger-then-detect: snapshot existing IDs → trigger action → sleep → query → diff to find new entry
+
+```groovy
+def startTime = System.currentTimeMillis()
+def timeoutMs = timeoutMinutes * 60 * 1000
+def timeoutTimestamp = startTime + timeoutMs
+
+while (System.currentTimeMillis() < timeoutTimestamp) {
+    def result = checkStatus(resourceId)
+    if (result.data.status == "completed") {
+        def duration = (System.currentTimeMillis() - startTime) / 1000
+        return _buildResponse(true, 200, result.data, "Completed in ${duration}s")
+    }
+    sleep(pollIntervalSeconds * 1000)
+}
+
+return _buildResponse(false, 408, null, "Timed out after ${timeoutMinutes} minutes")
 ```
