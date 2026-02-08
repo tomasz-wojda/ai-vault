@@ -1000,3 +1000,31 @@ while (System.currentTimeMillis() < timeoutTimestamp) {
 
 return _buildResponse(false, 408, null, "Timed out after ${timeoutMinutes} minutes")
 ```
+
+## Syntax Validation
+
+After every Jenkinsfile creation or edit, run the Groovy syntax check script before proceeding.
+
+Command:
+```bash
+JAVA_HOME=/opt/homebrew/opt/openjdk@17 groovy ~/.cursor/skills/jenkins-pipeline-architect/scripts/syntax_check.groovy [files...]
+```
+
+Usage:
+- No arguments: auto-discovers all `Jenkinsfile*.groovy` files in the current directory
+- With arguments: checks only the specified files
+- Exit code 0: all files pass, exit code 1: syntax errors found
+
+JDK 17 is required because Groovy 3.x ASM is incompatible with JDK 25. The `JAVA_HOME` override ensures the correct JDK is used.
+
+What the check validates:
+- Brace matching (`{` / `}`)
+- String literals and GString interpolation
+- Groovy grammar (closures, method calls, control flow)
+
+What it cannot validate (requires a running Jenkins):
+- Jenkins DSL methods (`node`, `stage`, `bat`, `timestamps`)
+- Plugin class imports (`ScriptApproval`)
+- Credential IDs, node labels, parameter names
+
+If errors are found, fix them before proceeding. Do not skip this step.

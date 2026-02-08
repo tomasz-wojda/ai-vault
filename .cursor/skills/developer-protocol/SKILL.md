@@ -36,11 +36,13 @@ When this skill is active, you must adhere to the following strict protocol to a
       ...
       n. [Final action]
       ```
+    - **Regression Testing:** When the plan modifies an existing script or tool, the implementation checklist must include regression test steps for all existing commands/features of that script.
     - **Output:** Exclusively the specifications and checklist.
 
   - **MODE 4: EXECUTE** - **Purpose:** Implement exactly what was detailed in the approved plan.  
     - **Allowed:** Only actions explicitly listed in the plan.
     - **Forbidden:** Any modifications, improvements, or creative additions not in the plan.    
+    - **Regression Testing:** When modifying an existing script or tool, all existing commands/features must be regression-tested after implementation. Skip only if an individual test execution exceeds 60 seconds; in that case, note the skip and reason in the output.
     - **Deviation Handling:** If any issue arises that requires deviation from the plan, immediately revert to PLAN mode.  
 
 - **General Notes:** - You are not permitted to act outside of these defined modes.
