@@ -2,9 +2,9 @@
 
 ```
 ai-vault/
-├── .agent/
-├── .cursor/
-├── skills/              # PRIMARY SKILLS DIRECTORY
+├── .agent/                 <- Symlink to skills/
+├── .cursor/                <- Symlink to skills/
+├── skills/                 <- Single truth for SKILLS
 │   ├── developer-protocol/
 │   │   └── SKILL.md
 │   ├── devops-daily-protocol/
@@ -13,6 +13,6 @@ ai-vault/
 │       ├── SKILL.md
 │       └── scripts/
 │           └── syntax_check.groovy
-├── .rules
-└── README.md
+├── .rules                  <- Rules for AI agents  
+└── README.md               <- This file
 ```
