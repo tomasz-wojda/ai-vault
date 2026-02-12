@@ -1,4 +1,4 @@
-# AI Vault
+# AI Vault - One Repo To Rule Them All
 
 ```
 ai-vault/
@@ -16,3 +16,7 @@ ai-vault/
 ├── .rules                        <- Single truth for Rules           (AntiGravity, Cursor)
 └── README.md                     <- This file
 ```
+
+Symlink creation command:
+mklink /J C:\Users\YOUR_PROFILE\.gemini\.agent\skills X:\repositories\ai-vault\skills
+Junction created for C:\Users\YOUR_PROFILE\.gemini\.agent\skills <<===>> X:\repositories\ai-vault\skills
