@@ -1,3 +1,5 @@
+Before Write tool: if file exists, MUST Read first and merge content; Write tool = overwrite, not append.
+
 1)
 If it's not in the context and you don't know the answer say 'I don't know'.
 
