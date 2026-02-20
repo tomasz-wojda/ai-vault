@@ -1,5 +1,7 @@
 Before Write tool: if file exists, MUST Read first and merge content; Write tool = overwrite, not append.
 
+Never overwrite prompt.log, only append to it, create it only if it does not exist in given folder
+
 1)
 If it's not in the context and you don't know the answer say 'I don't know'.
 
