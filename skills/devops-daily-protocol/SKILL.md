@@ -55,7 +55,7 @@ All paths are relative to the workspace root.
 
 - **kubectl patterns**: `zzzrecycle/monitor_commands.txt` — read this file for cluster diagnostic commands
 - **NR host audit**: `zzzrecycle/nr-audit.sh` — remote audit of New Relic config on docker hosts
-- **Worklog template**: `worklog/TEMPLATE.log` — structure for worklog files
+- **Worklog template**: `jira-worklog-processor/worklog.template` — structure for worklog files (in sibling skill)
 
 ## Workflow Modes
 
@@ -88,7 +88,7 @@ Steps:
    - If user approves: copy files back to `worklog/`, skip creating new worklog from template
    - If user declines: proceed with creating fresh worklog from template as normal
 4. **WRITE GATE**: Propose creating worklog file at `worklog/YYYY-MM-DD_TICKET-KEY.log`
-   - Pre-populate ticket header from JIRA response using TEMPLATE.log structure:
+   - Pre-populate ticket header from JIRA response using template structure:
      ```
      ================================================================================
        TICKET: <key>
@@ -252,7 +252,7 @@ worklog/done/YYYY-MM-DD_TICKET-KEY_suffix_raw.log (completed investigation data)
 
 ### Structure
 
-All worklog files follow `worklog/TEMPLATE.log`:
+All worklog files follow the `jira-worklog-processor/worklog.template` structure:
 
 | Section | Content |
 |---------|---------|

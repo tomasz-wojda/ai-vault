@@ -1,0 +1,4 @@
+pull up {TICKET_KEY}, create worklog with all the comments, findings,
+proposed actions and a plan with solutions and options,
+innovate on finding a solution, parse for referenced repositories
+and other actions, rename the session tab to just the ticket number ({TICKET_KEY})
