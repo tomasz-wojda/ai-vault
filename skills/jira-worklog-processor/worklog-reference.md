@@ -397,6 +397,31 @@ G4 — Close-Out
 [ ] Move to done/
 ```
 
+### Checkbox States (PR lifecycle)
+
+| Marker | Meaning |
+|--------|---------|
+| `[ ]` | Not started |
+| `[~]` | Covered by an open PR — diff matches, awaiting merge |
+| `[x]` | Done — PR merged and change landed |
+
+On PR review: matched items go `[ ]` → `[~]` (append PR URL on the line).
+On PR merge: items for that PR go `[~]` → `[x]`.
+Never skip `[~]` — do not mark `[x]` until merge is confirmed.
+
+Example after review:
+```
+PHASE 1 — Config changes
+[~] Update UAT values for aaa-public-api (PR #182)
+[ ] Update PROD values (separate PR pending)
+```
+
+Example after merge:
+```
+PHASE 1 — Config changes
+[x] Update UAT values for aaa-public-api (PR #182 — merged)
+```
+
 ## ACTION LOG Section
 
 Chronological, timestamped, factual. No opinions — just what was done.
@@ -521,16 +546,18 @@ Entry structure:
 | METADATA | Title, author, branch, created, state, labels, CI, reviews, requested reviewers |
 | CHANGED FILES | Count + per-file summary with change type and description |
 | REFERENCED MODULE | External dependency details — tags, changelogs, related PRs (when applicable) |
-| WORKLOG CROSS-REFERENCE | Ticket key, worklog path, checklist coverage ([x] covered / [ ] missing), out-of-scope changes |
+| WORKLOG CROSS-REFERENCE | Ticket key, worklog path, checklist coverage ([~] in PR / [ ] missing), out-of-scope changes |
 | SCALING COMPARISON | Before/after metrics (when PR changes resource configs) |
 | OBSERVATIONS | Numbered analysis: risks, missing items, patterns, recommendations |
 
 ### PR.log ↔ Worklog Cross-Reference
 
 When a PR relates to a worklog:
-- PR.log entry includes WORKLOG CROSS-REFERENCE with checklist coverage map
-- Worklog ACTION LOG gets an entry: `YYYY-MM-DD HH:MM - Reviewed PR #N (org/repo): <outcome>`
-- If PR implements checklist items, mark them `[x]` in the worklog PROPOSED ACTIONS
+- PR.log entry includes WORKLOG CROSS-REFERENCE with checklist coverage map using `[~]` for covered items
+- Worklog ACTION LOG gets an entry: `YYYY-MM-DD HH:MM - Reviewed PR #N (org/repo): <outcome>, N items marked [~]`
+- **On review**: matched PROPOSED ACTIONS items go `[ ]` → `[~]` (append PR URL)
+- **On merge**: items tied to that PR go `[~]` → `[x]`; ACTION LOG notes merge and count marked `[x]`
+- PR.log gets a merge follow-up note when applicable
 
 ### PR Types by Review Depth
 

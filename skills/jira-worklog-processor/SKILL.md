@@ -63,6 +63,7 @@ as a placeholder. The agent never edits this file — it reads it as an instruct
 | "pull up KD-1234" | Full pipeline: RESEARCH → INNOVATE → PLAN. Read `default_prompt`, substitute `{TICKET_KEY}` with KD-1234, execute all steps. |
 | "research KD-1234" | Stop after Phase 2 (FINDINGS only). No solutions or plan. |
 | "review PR #123" | PR review workflow (see PR Review section). |
+| "PR #123 merged" | Merge follow-up: `[~]` → `[x]` in PROPOSED ACTIONS (see PR Review section). |
 
 ### Full Pipeline Steps (triggered by "pull up")
 
@@ -258,20 +259,40 @@ For scripts, SSH outputs, plans, data files:
 
 Triggered by "review this PR", "review PR #N", or a GitHub PR URL.
 
+### PROPOSED ACTIONS Checkbox States
+
+| Marker | Meaning | When applied |
+|--------|---------|--------------|
+| `[ ]` | Not started | Default at plan time |
+| `[~]` | In PR — diff covers this item, PR still open | PR review (step 9 below) |
+| `[x]` | Done — change landed | PR merged (see Merge Follow-up below) |
+
+Never mark `[x]` during review. Review marks covered items `[~]` only.
+
 ### Flow
 
-1. **Extract PR metadata** — use `gh pr view <URL-or-number> --json title,body,author,baseRefName,headRefName,files,reviews,reviewRequests`
+1. **Extract PR metadata** — use `gh pr view <URL-or-number> --json title,body,author,baseRefName,headRefName,files,reviews,reviewRequests,state`
 2. **Identify the ticket key** — parse from PR title, branch name, or body (patterns: `KD-1234`, `DEVOPS-123`, `CWP-1234`)
 3. **Find the worklog** — search `worklog/*_<TICKET-KEY>.log` and `worklog/done/*_<TICKET-KEY>.log`
 4. **Read the worklog** — extract PROPOSED ACTIONS / IMPLEMENTATION CHECKLIST / PROPOSED SOLUTIONS to understand what the PR *should* be doing
 5. **Fetch the PR diff** — `gh pr diff <number>`
 6. **Compare diff against worklog plan** — for each changed file, check:
-   - Does this change match a checklist item? Mark it.
+   - Does this change match a checklist item? Candidate for `[~]` (not `[x]`).
    - Are there changes NOT in the plan? Flag as out-of-scope.
-   - Are there checklist items NOT covered by the diff? Flag as missing.
+   - Are there checklist items NOT covered by the diff? Leave as `[ ]`, flag as missing.
 7. **Produce structured review output** — see format below
 8. **WRITE GATE**: Append entry to `PR.log`
-9. **Update worklog ACTION LOG** — note the PR review with PR number, repo, outcome
+9. **WRITE GATE**: Update worklog PROPOSED ACTIONS — change matched `[ ]` items to `[~]`; append PR link on the same line
+10. **Update worklog ACTION LOG** — note the PR review with PR number, repo, outcome, count of `[~]` items
+
+### Merge Follow-up
+
+Triggered when user says "PR #N merged", or when `gh pr view` shows `state: MERGED`.
+
+1. Confirm PR is merged via `gh pr view`
+2. **WRITE GATE**: In worklog PROPOSED ACTIONS, change `[~]` items tied to that PR from `[~]` to `[x]`
+3. Update ACTION LOG: `YYYY-MM-DD HH:MM - PR #N merged (org/repo): N checklist items marked [x]`
+4. **WRITE GATE**: Append merge note to `PR.log` entry (or add short follow-up block under the original review)
 
 ### PR.log Entry Format
 
@@ -298,8 +319,8 @@ CHANGED FILES (N files, +X/-Y):
 WORKLOG CROSS-REFERENCE: <TICKET-KEY>
   Worklog: worklog/YYYY-MM-DD_<TICKET-KEY>.log
   Checklist coverage:
-    [x] Step N — covered by file.ext changes
-    [x] Step M — covered by file2.ext changes
+    [~] Step N — covered by file.ext changes (PR open)
+    [~] Step M — covered by file2.ext changes (PR open)
     [ ] Step K — NOT in this PR (still pending)
   Out-of-scope changes:
     - file3.ext — not mentioned in worklog plan
