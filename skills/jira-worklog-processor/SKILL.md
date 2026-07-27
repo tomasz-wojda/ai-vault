@@ -6,7 +6,7 @@ description: >-
   patterns (FINDINGS, solution options, gap analysis, phased action plans).
   Also handles PR reviews by comparing diffs against worklog plans.
   Use when the user picks up a JIRA ticket, asks to create a worklog,
-  references default_prompt, says "pull up TICKET-KEY", says "review this PR",
+  references ticket-pickup.prompt, says "pull up TICKET-KEY", says "review this PR",
   says "review PR #N", or starts daily DevOps work on a ticket.
 ---
 
@@ -50,20 +50,20 @@ zzzrecycle/monitor_commands.txt         # kubectl diagnostic patterns
 prompt.log                              # Session audit trail (append-only)
 ```
 
-The `default_prompt` template ships with this skill at [default_prompt](default_prompt).
+The `ticket-pickup.prompt` template ships with this skill at [ticket-pickup.prompt](ticket-pickup.prompt).
 
 See [worklog-reference.md](worklog-reference.md) § "Interface Directory" for full service inventory.
 
 ## Quick Start — Default Prompt
 
-This skill ships with a [default_prompt](default_prompt) template containing `{TICKET_KEY}`
+This skill ships with a [ticket-pickup.prompt](ticket-pickup.prompt) template containing `{TICKET_KEY}`
 as a placeholder. The agent never edits this file — it reads it as an instruction template.
 
 ### Trigger Patterns
 
 | User says | Behavior |
 |-----------|----------|
-| "pull up KD-1234" | Full pipeline: RESEARCH → INNOVATE → PLAN. Read `default_prompt`, substitute `{TICKET_KEY}` with KD-1234, execute all steps. |
+| "pull up KD-1234" | Full pipeline: RESEARCH → INNOVATE → PLAN. Read `ticket-pickup.prompt`, substitute `{TICKET_KEY}` with KD-1234, execute all steps. |
 | "research KD-1234" | Stop after Phase 2 (FINDINGS only). No solutions or plan. |
 | "review PR #123" | PR review workflow (see PR Review section). |
 | "PR #123 merged" | Merge follow-up: `[~]` → `[x]` in PROPOSED ACTIONS (see PR Review section). |
@@ -71,7 +71,7 @@ as a placeholder. The agent never edits this file — it reads it as an instruct
 ### Full Pipeline Steps (triggered by "pull up")
 
 1. Extract `TICKET-KEY` from user input
-2. Read [default_prompt](default_prompt), substitute `{TICKET_KEY}`
+2. Read [ticket-pickup.prompt](ticket-pickup.prompt), substitute `{TICKET_KEY}`
 3. Fetch the ticket via JIRA CLI
 4. Check for existing worklog in `worklog/` and `worklog/done/`
 5. Create `worklog/YYYY-MM-DD_<TICKET-KEY>.log` from [worklog.template](worklog.template)
@@ -84,7 +84,7 @@ as a placeholder. The agent never edits this file — it reads it as an instruct
 
 ## Default Prompt Lifecycle
 
-The `default_prompt` file is a **static template** — the agent never modifies it.
+The `ticket-pickup.prompt` file is a **static template** — the agent never modifies it.
 
 | Aspect | Behavior |
 |--------|----------|
@@ -92,7 +92,7 @@ The `default_prompt` file is a **static template** — the agent never modifies 
 | Placeholder | `{TICKET_KEY}` — resolved at runtime from what the user types in chat, not from editing the file. |
 | After worklog creation | No change. The template stays as-is with `{TICKET_KEY}`. |
 | Multi-ticket sessions | User types the next ticket key directly in chat. The trigger patterns table handles resolution. |
-| Location | Ships with this skill at [default_prompt](default_prompt). Also kept at workspace root for quick reference. |
+| Location | Ships with this skill at [ticket-pickup.prompt](ticket-pickup.prompt). Also kept at workspace root for quick reference. |
 
 The file exists so new sessions can reference it as a startup instruction set. The `{TICKET_KEY}` placeholder is never literally written anywhere — it is always substituted in-memory when the agent reads the template.
 
@@ -122,7 +122,7 @@ Read operations (always allowed): JIRA CLI, NR CLI, file reads, kubectl read-onl
 
 ## Phase 1: Ticket Pickup
 
-0. Read [default_prompt](default_prompt) template. Extract `TICKET-KEY` from user input.
+0. Read [ticket-pickup.prompt](ticket-pickup.prompt) template. Extract `TICKET-KEY` from user input.
    Substitute `{TICKET_KEY}` in the template. Follow all steps described in the template.
 1. Run `jira/jira-ticket-info.sh <TICKET-KEY>` to fetch full ticket detail
 2. Parse output: key, summary, status, type, priority, project, assignee, reporter,

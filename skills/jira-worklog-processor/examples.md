@@ -203,7 +203,7 @@ Instead: SHA256 hashes, "key present (54B)", reference to properties file path.
 
 ## Default Prompt Workflow — Full Sequence
 
-When user triggers via `default_prompt` or equivalent:
+When user triggers via `ticket-pickup.prompt` or equivalent:
 
 ```
 INPUT:  "pull up KD-6945, create worklog with all the comments, findings,

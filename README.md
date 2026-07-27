@@ -15,7 +15,7 @@ ai-vault/
 │   │       └── syntax_check.groovy
 │   └── jira-worklog-processor/
 │       ├── SKILL.md
-│       ├── default_prompt
+│       ├── ticket-pickup.prompt
 │       ├── worklog.template
 │       ├── worklog-reference.md
 │       └── examples.md

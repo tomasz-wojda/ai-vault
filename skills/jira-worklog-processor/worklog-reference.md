@@ -621,7 +621,7 @@ repos/ai-vault/
     │   └── scripts/syntax_check.groovy
     └── jira-worklog-processor/
         ├── SKILL.md                    # Worklog content generation patterns
-        ├── default_prompt              # Ticket pickup template ({TICKET_KEY} placeholder)
+        ├── ticket-pickup.prompt              # Ticket pickup template ({TICKET_KEY} placeholder)
         ├── worklog.template            # Worklog section scaffold (was TEMPLATE.log)
         ├── worklog-reference.md        # Section specs, folder trees, interface directory
         └── examples.md                 # Real ticket examples
