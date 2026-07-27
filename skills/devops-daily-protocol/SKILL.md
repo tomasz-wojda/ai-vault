@@ -52,7 +52,26 @@ All paths are relative to the workspace root.
 - **NR host audit**: `zzzrecycle/nr-audit.sh` — remote audit of New Relic config on docker hosts
 - **Worklog template**: `skills/jira-worklog-processor/worklog.template` — structure for worklog files (managed by sibling skill `jira-worklog-processor`)
 
+## Cross-Skill Handoffs
+
+This skill serves as the **operational lifecycle shell (Layer 2)** and orchestrates handoffs to sibling skills:
+
+1. **Handoff to `jira-worklog-processor` (Content Engine):**
+   - **Trigger:** Ticket Pickup or Investigation update.
+   - **Contract:** `devops-daily-protocol` executes JIRA CLI commands to fetch ticket metadata and then delegates worklog section formatting to `jira-worklog-processor` using `skills/jira-worklog-processor/worklog.template`.
+
+2. **Handoff to `jenkins-pipeline-architect` (CI/CD Specialist):**
+   - **Trigger:** Investigation mode identifies a Jenkins failure or build pipeline bug.
+   - **Contract:** Delegates Jenkinsfile inspection, Groovy CPS analysis, and syntax validation (`syntax_check.groovy`) to `jenkins-pipeline-architect`.
+
+3. **Governance by `developer-protocol` (Mode Control):**
+   - Read operations (JIRA CLI, NR CLI, kubectl) execute under `RESEARCH` mode.
+   - All Write Gate proposals (file updates, Tempo time logging, git operations) execute under `PLAN` / `EXECUTE` modes.
+
+For the full interaction matrix, see [CROSS_SKILL_INTEGRATION.md](../CROSS_SKILL_INTEGRATION.md).
+
 ## Workflow Modes
+
 Five modes triggered by user intent. Detect the appropriate mode from context.
 
 ### MODE: Day Start

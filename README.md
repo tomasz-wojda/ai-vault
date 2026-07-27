@@ -23,25 +23,28 @@ ai-vault/
 └── README.md                     <- This file
 ```
 
-## Skill Layering
+## Skill Layering & Integration
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  jira-worklog-processor                         │
-│  Content: FINDINGS patterns, solution options,  │
-│  gap analysis, gate plans, cross-ticket refs    │
+│  developer-protocol                             │
+│  Governance: RESEARCH → INNOVATE → PLAN → EXEC  │
 ├─────────────────────────────────────────────────┤
 │  devops-daily-protocol                          │
 │  Lifecycle: pickup, investigation, done, verify │
 │  Tools: JIRA CLI, NR CLI, Tempo API             │
 ├─────────────────────────────────────────────────┤
-│  developer-protocol                             │
-│  Modes: RESEARCH → INNOVATE → PLAN → EXECUTE   │
+│  jira-worklog-processor                         │
+│  Content: FINDINGS patterns, solution options,  │
+│  gap analysis, gate plans, cross-ticket refs    │
 ├─────────────────────────────────────────────────┤
 │  jenkins-pipeline-architect                     │
 │  CI/CD: scripted pipelines, JIRA notifications  │
 └─────────────────────────────────────────────────┘
 ```
+
+For full details on handoff protocols, artifact ownership, and data flows between skills, see the master [Cross-Skill Integration Guide](file:///Users/gmb/workspace/ai-vault/skills/CROSS_SKILL_INTEGRATION.md).
+
 
 ## Symlink Setup
 

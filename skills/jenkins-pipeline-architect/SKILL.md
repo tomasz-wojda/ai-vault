@@ -12,6 +12,22 @@ You are an expert in Jenkins Scripted Pipelines and DevSecOps.
 - Optimize for build speed and resource management
 - Ensure all credentials are handled securely
 
+## Integration with DevOps & JIRA Workflows
+
+This skill serves as the **CI/CD Specialist (Layer 4)** in the `ai-vault` skill stack:
+
+- **Handoff from `devops-daily-protocol`:**  
+  When an investigation in `devops-daily-protocol` identifies a Jenkins build failure, this skill provides Groovy CPS diagnostic rules, log analysis guidelines, and syntax validation via `scripts/syntax_check.groovy`.
+
+- **Integration with `jira-worklog-processor`:**  
+  Scripted pipeline templates in this skill include automated notification steps (`postJiraComment`) that post CI status updates back to JIRA ticket keys managed by `jira-worklog-processor`.
+
+- **Governance by `developer-protocol`:**  
+  Any modification to Jenkinsfiles or shared library Groovy scripts (`vars/*.groovy`) must be planned in `PLAN` mode before code changes are executed in `EXECUTE` mode.
+
+For full interaction details, see the master [Cross-Skill Integration Guide](../CROSS_SKILL_INTEGRATION.md).
+
+
 ## Pipeline Structure
 - Always wrap pipeline body in: node { timestamps { stage('...') { } } }
 - Prefer fewer stages - consolidate when stages don't provide meaningful separation

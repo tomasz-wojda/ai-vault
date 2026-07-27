@@ -48,3 +48,22 @@ When this skill is active, you must adhere to the following strict protocol to a
 - **General Notes:** - You are not permitted to act outside of these defined modes.
   - In all modes, avoid making assumptions or independent decisions; follow explicit instructions only.
   - If there is any uncertainty or if further clarification is needed, ask clarifying questions before proceeding.
+
+## Integration with Operational Skills
+
+This skill acts as the **governance layer (Layer 1)** across all sibling skills:
+
+- **Overlay on `devops-daily-protocol`:**  
+  When `devops-daily-protocol` is active:
+  - `RESEARCH` mode aligns with Day Start and early Investigation Mode (read-only queries, NRQL, kubectl).
+  - `INNOVATE` mode aligns with evaluating solution options before writing to worklogs.
+  - `PLAN` mode aligns with constructing `PROPOSED ACTIONS` checklists in worklogs.
+  - `EXECUTE` mode aligns with running approved Write Gate operations.
+
+- **Overlay on `jira-worklog-processor`:**  
+  Mode transitions govern when content sections in `worklog/` files may be populated (e.g. `FINDINGS` in `RESEARCH`, `PROPOSED SOLUTIONS` in `INNOVATE`, `PROPOSED ACTIONS` in `PLAN`).
+
+- **Overlay on `jenkins-pipeline-architect`:**  
+  Scripted pipeline refactoring or Groovy code edits must pass through `PLAN` mode before code changes are applied in `EXECUTE` mode.
+
+For the complete interaction matrix, see [CROSS_SKILL_INTEGRATION.md](../CROSS_SKILL_INTEGRATION.md).

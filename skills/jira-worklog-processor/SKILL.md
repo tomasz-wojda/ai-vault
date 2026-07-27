@@ -20,14 +20,17 @@ phased action plans, and manage cross-ticket investigations.
 
 | Skill | Source | What it covers |
 |-------|--------|----------------|
-| `devops-daily-protocol` | `repos/ai-vault/skills/` | Lifecycle shell: Day Start → Pickup → Investigation → Done → Day End. Tool contracts (JIRA CLI, NR CLI). Write Gate Protocol. Tempo API. prompt.log. |
-| `developer-protocol` | `repos/ai-vault/skills/` | Mode discipline: RESEARCH → INNOVATE → PLAN → EXECUTE. Transition rules. Regression testing. |
-| `jenkins-pipeline-architect` | `repos/ai-vault/skills/` | Jenkins scripted pipelines. JIRA notification from CI/CD (`postJiraComment`). Syntax validation. |
-| **this skill** | `tmp/worklog_skill/` | **Content generation**: how to write each worklog section. FINDINGS patterns (architecture, audit, gap, inventory). Solution option format. Gate-based action plans. Cross-ticket references. tmp/ artifact management. Real examples from 40+ tickets. |
+| `devops-daily-protocol` | `skills/devops-daily-protocol/` | Lifecycle shell: Day Start → Pickup → Investigation → Done → Day End. Tool contracts (JIRA CLI, NR CLI). Write Gate Protocol. Tempo API. prompt.log. |
+| `developer-protocol` | `skills/developer-protocol/` | Mode discipline: RESEARCH → INNOVATE → PLAN → EXECUTE. Transition rules. Regression testing. |
+| `jenkins-pipeline-architect` | `skills/jenkins-pipeline-architect/` | Jenkins scripted pipelines. JIRA notification from CI/CD (`postJiraComment`). Syntax validation. |
+| **this skill** | `skills/jira-worklog-processor/` | **Content generation**: how to write each worklog section. FINDINGS patterns (architecture, audit, gap, inventory). Solution option format. Gate-based action plans. Cross-ticket references. Worklog template (`worklog.template`). |
 
 This skill does NOT duplicate the lifecycle/tool/safety rules from `devops-daily-protocol` —
 it layers content quality patterns on top. When both skills are active, `devops-daily-protocol`
 governs *when* and *how* to create/update files; this skill governs *what goes inside them*.
+
+For full interaction details, see the master [Cross-Skill Integration Guide](../CROSS_SKILL_INTEGRATION.md).
+
 
 ## Workspace Dependencies
 
