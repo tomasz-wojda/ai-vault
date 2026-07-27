@@ -50,7 +50,7 @@ All paths are relative to the workspace root.
 ### Monitoring References
 - **kubectl patterns**: `zzzrecycle/monitor_commands.txt` — read this file for cluster diagnostic commands
 - **NR host audit**: `zzzrecycle/nr-audit.sh` — remote audit of New Relic config on docker hosts
-- **Worklog template**: `jira-worklog-processor/worklog.template` — structure for worklog files (in sibling skill)
+- **Worklog template**: `skills/jira-worklog-processor/worklog.template` — structure for worklog files (managed by sibling skill `jira-worklog-processor`)
 
 ## Workflow Modes
 Five modes triggered by user intent. Detect the appropriate mode from context.
@@ -300,7 +300,7 @@ worklog/done/YYYY-MM-DD_TICKET-KEY_suffix_raw.log (completed investigation data)
 - Files in `done/` are excluded from `verify` scanning
 
 ### Structure
-All worklog files follow the `jira-worklog-processor/worklog.template` structure:
+All worklog files follow the `skills/jira-worklog-processor/worklog.template` structure:
 
 | Section | Content |
 |---------|---------|
