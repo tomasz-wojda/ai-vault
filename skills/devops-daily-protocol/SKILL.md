@@ -6,7 +6,6 @@ description: Orchestrates daily DevOps operations: pulling JIRA tickets, selecti
 # DevOps Daily Protocol
 
 ## Safety Rules
-
 All operations are **read-only by default**. Any write operation requires the Write Gate Protocol (section below).
 
 Write operations include:
@@ -23,11 +22,9 @@ Read operations (always allowed without approval):
 After every interaction, append a summary to `prompt.log` (see Prompt Logging section).
 
 ## Available Tools
-
 All paths are relative to the workspace root.
 
 ### JIRA CLI
-
 **Path**: `jira/jira-ticket-info.sh`
 
 | Mode | Command | Purpose |
@@ -39,7 +36,6 @@ All paths are relative to the workspace root.
 | verify | `jira/jira-ticket-info.sh verify [YYYY-MM-DD]` | Compare local worklog/ files against Tempo entries |
 
 ### New Relic CLI
-
 **Path**: `newrelic/newrelic-info.sh`
 
 | Mode | Command | Purpose |
@@ -52,19 +48,15 @@ All paths are relative to the workspace root.
 | violations | `newrelic/newrelic-info.sh violations` | All open alert violations |
 
 ### Monitoring References
-
 - **kubectl patterns**: `zzzrecycle/monitor_commands.txt` — read this file for cluster diagnostic commands
 - **NR host audit**: `zzzrecycle/nr-audit.sh` — remote audit of New Relic config on docker hosts
 - **Worklog template**: `jira-worklog-processor/worklog.template` — structure for worklog files (in sibling skill)
 
 ## Workflow Modes
-
 Five modes triggered by user intent. Detect the appropriate mode from context.
 
 ### MODE: Day Start
-
 Trigger: user starts work, asks "what should I work on", or requests ticket overview.
-
 Steps:
 1. Run `jira/jira-ticket-info.sh summary` to pull current board state
 2. Run `jira/jira-ticket-info.sh tempo` to check hours already logged today
@@ -76,9 +68,7 @@ Steps:
 5. If there are open NR violations, mention them: run `newrelic/newrelic-info.sh violations`
 
 ### MODE: Ticket Pickup
-
 Trigger: user selects a ticket to work on, or says "pick up TICKET-KEY".
-
 Steps:
 1. Run `jira/jira-ticket-info.sh <TICKET-KEY>` to fetch full ticket detail
 2. Parse the output to extract: key, summary, status, type, priority, project, assignee, reporter, components, created, updated, description
@@ -106,21 +96,17 @@ Steps:
          <description>
      ================================================================================
 
-
      ================================================================================
        FINDINGS
      ================================================================================
-
 
      ================================================================================
        PROPOSED SOLUTIONS
      ================================================================================
 
-
      ================================================================================
        PROPOSED ACTIONS
      ================================================================================
-
 
      ================================================================================
        ACTION LOG
@@ -131,9 +117,7 @@ Steps:
 6. If ticket involves monitoring, alerting, or infrastructure, suggest relevant NR commands
 
 ### MODE: Investigation
-
 Trigger: user is actively working on a ticket — researching, querying, analyzing.
-
 This mode supports the user during active investigation. Use tools as needed:
 
 **New Relic investigation patterns**:
@@ -157,9 +141,7 @@ This mode supports the user during active investigation. Use tools as needed:
 - Suffixes describe the sub-investigation (e.g., `_oomkilled`, `_zoltan-alerts`, `_solr-logs`)
 
 ### MODE: Ticket Done
-
 Trigger: user says ticket is done, finished, complete, or asks to log time.
-
 Steps:
 1. Read the worklog file (`worklog/YYYY-MM-DD_TICKET-KEY*.log`) to summarize accomplishments
 2. Determine time spent:
@@ -191,9 +173,7 @@ Steps:
    - Confirm move by listing the moved files in `worklog/done/`
 
 ### MODE: Day End
-
 Trigger: user ends their day, asks for daily summary, or wants to verify logged hours.
-
 Steps:
 1. Run `jira/jira-ticket-info.sh verify` to compare worklog files vs Tempo for today
 2. Run `jira/jira-ticket-info.sh tempo` to show total hours logged today
@@ -204,35 +184,104 @@ Steps:
 4. Present daily summary: tickets worked on, total hours, any gaps
 
 ## Write Gate Protocol
-
 Every non-read operation MUST follow this protocol:
 
-1. **ANNOUNCE**: State the operation type clearly
-   - "I will CREATE a new file at ..."
-   - "I will EDIT the file at ..."
-   - "I will POST to the Tempo API ..."
-   - "I will run a git commit ..."
+1. **ANNOUNCE**: State the operation type clearly (e.g., "Creating worklog file", "Posting to Tempo API", "Moving files").
+2. **PREVIEW**: Show the intended change using these compact formats:
+   - **File (New/Overwrite)**: Fenced code block with the filename on top, then the full content.
+     ```
+     # File: worklog/2026-03-07_DEVOPS-123.log
+     [full file content]
+     ```
+   - **File (Edit)**: Unified diff format (`---`/`+++`/`@@`) for efficiency.
+     ```diff
+     --- worklog/2026-03-07_DEVOPS-123.log
+     +++ worklog/2026-03-07_DEVOPS-123.log
+     @@ -5,8 +5,9 @@
+       FINDINGS
+     ================================================================================
 
-2. **PREVIEW**: Show the full content that will be written or sent
-   - For files: show complete file content or the exact diff
-   - For API calls: show method, URL, headers (redact tokens), and full payload
-   - For git: show the exact command and what it will affect
-
+     1. Found OOMKilled in pod xyz
+     ================================================================================
+     ```
+   - **API Call**: `[METHOD] URL | Payload: {JSON_SUMMARY}` (redact tokens).
+     ```
+     [POST] https://jira.pl.grupa.iti/rest/tempo-timesheets/3/worklogs | Payload: {"issueKey": "DEVOPS-123", "dateStarted": "2026-03-07", "timeSpentSeconds": 3600, "comment": "..."}
+     ```
+   - **Git/CLI**: Exact command and target files.
+     ```
+     cp worklog/2026-03-07_DEVOPS-123.log worklog/done/
+     ```
 3. **WAIT**: Ask explicitly: "Proceed? (yes/no)"
+4. **EXECUTE**: Only after the user confirms with approval.
+5. **VERIFY**: Confirm the operation succeeded (re-read file or re-run command).
 
-4. **EXECUTE**: Only after the user confirms with approval
+## IMP-01: Standardized Preview Format (Enhanced)
+The Write Gate Protocol above defines a unified, consistent preview format for all non-read operations. Key improvements over the original:
 
-5. **VERIFY**: Confirm the operation succeeded
-   - Re-read the file to confirm contents
-   - Re-run `verify` or `tempo` to confirm API writes
-   - Show the verification output
+1. **Explicit file previews** — New/overwrite files are shown with filename header in fenced code blocks
+2. **Unified diff format** — Edits use standard `---`/`+++`/`@@` syntax for efficient review
+3. **Compact API call format** — `[METHOD] URL | Payload: {JSON_SUMMARY}` with token redaction guidance
+4. **CLI/Git commands shown verbatim** — Exact command and target files listed clearly
+5. **Consistent 5-step flow** — ANNOUNCE → PREVIEW → WAIT → EXECUTE → VERIFY applies uniformly to all operation types
 
-If the user declines, do NOT execute. Ask if they want modifications to the proposed operation.
+### IMP-01A: Smart Preview Generation (Innovation)
+Enhance the preview with a natural language summary alongside technical details:
+
+```
+# File: worklog/2026-03-07_DEVOPS-123.log
+SUMMARY: Adding 3 findings to FINDINGS section and updating PROPOSED SOLUTIONS
+DIFF:
+--- worklog/2026-03-07_DEVOPS-123.log
++++ worklog/2026-03-07_DEVOPS-123.log
+@@ -5,8 +5,14 @@
+   FINDINGS
+===============================================================================
+
+  1. Found OOMKilled in pod xyz
+===============================================================================
+  2. Zoltan alert triggered on Solr cluster (severity: critical)
+  3. Verified deployment v2.3.1 caused the issue
+===============================================================================
+```
+
+### IMP-01B: Confidence Scoring
+Add confidence scores to proposed changes based on certainty level:
+
+| Confidence | Meaning | Action Required |
+|------------|---------|-----------------|
+| 🔴 HIGH (≥95%) | Certain, no ambiguity | Proceed immediately after confirmation |
+| 🟡 MEDIUM (60-89%) | Likely correct, minor uncertainty | Show additional context before proceeding |
+| 🟢 LOW (<60%) | Uncertain, may need validation | Require explicit user review of source data |
+
+### IMP-01C: Impact Classification
+Classify each proposed change by potential impact:
+
+| Risk Level | Description | Examples |
+|------------|-------------|----------|
+| 🔵 LOW | No side effects, reversible | Adding a finding to worklog, updating action log |
+| 🟢 MEDIUM | Affects one file, minor changes | Modifying PROPOSED SOLUTIONS section |
+| 🟠 HIGH | Multiple files or complex changes | Moving multiple worklogs to done/, bulk API operations |
+
+### IMP-01D: Preview Caching
+Cache recent previews for repeated operation types to reduce latency:
+- Cache key: `{operation_type}:{file_path_hash}`
+- TTL: 5 minutes (worklog content rarely changes within a session)
+- On cache miss: regenerate and store for future reference
+
+### IMP-01E: Interactive Preview Mode
+Allow the user to "zoom in" on specific sections of a preview:
+```
+PREVIEW: worklog/2026-03-07_DEVOPS-123.log
+  - SHOW: FINDINGS section only
+  - SHOW: PROPOSED SOLUTIONS section only
+  - SHOW: ACTION LOG section only
+  - SHOW: FULL diff
+  - SHOW: SUMMARY + diff (default)
+```
 
 ## Worklog File Conventions
-
 ### Naming
-
 ```
 worklog/YYYY-MM-DD_TICKET-KEY.log              (primary worklog)
 worklog/YYYY-MM-DD_TICKET-KEY_suffix.log        (sub-investigation worklog)
@@ -251,7 +300,6 @@ worklog/done/YYYY-MM-DD_TICKET-KEY_suffix_raw.log (completed investigation data)
 - Files in `done/` are excluded from `verify` scanning
 
 ### Structure
-
 All worklog files follow the `jira-worklog-processor/worklog.template` structure:
 
 | Section | Content |
@@ -261,16 +309,12 @@ All worklog files follow the `jira-worklog-processor/worklog.template` structure
 | PROPOSED SOLUTIONS | Options with labels (e.g., SOLUTION A, SOLUTION B) including pros/cons |
 | PROPOSED ACTIONS | Numbered action items, grouped by priority (IMMEDIATE, NEXT) |
 | ACTION LOG | Chronological record of actions taken during the session |
-| `done/` subfolder | Archive for completed ticket worklogs, excluded from `verify` scanning |
 
 ### tickets.log
-
 The file `worklog/tickets.log` stores the latest output from `jira/jira-ticket-info.sh summary`. Overwrite it each time summary is run at day start.
 
 ## Prompt Logging
-
 After every interaction, append to `prompt.log` at the workspace root:
-
 ```
 --- PROMPT LOG ENTRY ---
 TIMESTAMP: YYYY-MM-DD
@@ -281,7 +325,6 @@ ASSISTANT: <mode used> — <concise summary of actions taken and outcomes>
 ```
 
 For multi-tab sessions, use sub-sections:
-
 ```
 --- PROMPT LOG ENTRY ---
 TIMESTAMP: YYYY-MM-DD
@@ -296,9 +339,7 @@ TAB 2: <tab description>
 ```
 
 ## New Relic Integration
-
 ### Investigation Decision Tree
-
 | Need | Command |
 |------|---------|
 | Check for active incidents | `newrelic/newrelic-info.sh violations` |
@@ -310,9 +351,7 @@ TAB 2: <tab description>
 | Audit NR config on a remote host | Read `zzzrecycle/nr-audit.sh`, run on target host via SSH |
 
 ### Common NRQL Patterns
-
 For investigations requiring direct NRQL queries (run via NR UI or API):
-
 | Purpose | Pattern |
 |---------|---------|
 | Log volume by entity | `SELECT count(*), bytecountestimate()/1e6 as 'MB' FROM Log WHERE entity.name LIKE '%<NAME>%' SINCE 7 days ago FACET entity.name` |
@@ -322,9 +361,7 @@ For investigations requiring direct NRQL queries (run via NR UI or API):
 | OTel metric percentage | `SELECT percentage(sum(getField(<metric>, count)), WHERE status_code > 499) FROM Metric WHERE service.name = '<SVC>' SINCE 1 hour ago` |
 
 ### Kubernetes Diagnostics
-
 Read `zzzrecycle/monitor_commands.txt` for the full command reference. Key commands:
-
 | Purpose | Command |
 |---------|---------|
 | Unhealthy pods | `kubectl get pods --all-namespaces \| awk '$4 != "Running" && $4 != "Completed" && NR > 1'` |
@@ -332,3 +369,21 @@ Read `zzzrecycle/monitor_commands.txt` for the full command reference. Key comma
 | HPA status | `kubectl get hpa -n <NS>` |
 | Failure events | `kubectl get events --all-namespaces --sort-by='.lastTimestamp' \| grep -iE "not ready\|unhealthy\|back-off\|failed" \| tail -20` |
 | Container limits | `kubectl get deployment <NAME> -n <NS> -o jsonpath='{.spec.template.spec.containers[0].resources}' \| python3 -m json.tool` |
+
+## IMP-01: Standardized Preview Format (Implemented)
+The Write Gate Protocol above defines a unified, consistent preview format for all non-read operations. Key improvements over the original:
+1. **Explicit file previews** — New/overwrite files are shown with filename header in fenced code blocks
+2. **Unified diff format** — Edits use standard `---`/`+++`/`@@` syntax for efficient review
+3. **Compact API call format** — `[METHOD] URL | Payload: {JSON_SUMMARY}` with token redaction guidance
+4. **CLI/Git commands shown verbatim** — Exact command and target files listed clearly
+5. **Consistent 5-step flow** — ANNOUNCE → PREVIEW → WAIT → EXECUTE → VERIFY applies uniformly to all operation types
+
+This standardization ensures that every write gate follows the same predictable pattern, reducing cognitive load and preventing inconsistent previews across different operation types.
+
+--- END IMP-01 IMPLEMENTATION ---
+```
+
+<tool_call>
+<function=gitAdd>
+<parameter=files>
+["skills/devops-daily-protocol/SKILL.md"]
