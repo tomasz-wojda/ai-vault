@@ -92,25 +92,39 @@ tmp/
 
 ## Interface Directory — Service Connectivity
 
-`worklog/interface/` is the canonical location for service credentials and CLI scripts.
-Each subfolder corresponds to one external service.
+`worklog/interface/` is the **required target layout** for service credentials and CLI
+scripts. Each subfolder corresponds to one external service. All skill tool paths are
+written against it.
+
+A workspace may predate this layout, with service folders sitting directly at the
+workspace root (`jira/`, `newrelic/`, …). Migrate with:
+
+```
+ai-vault/scripts/setup-workspace-interface.sh <workspace> --dry-run
+ai-vault/scripts/setup-workspace-interface.sh <workspace> --link
+```
+
+`--link` places symlinks under `worklog/interface/` pointing at the existing folders, so
+the target paths resolve without moving any data. `--move` performs the final relocation.
 
 ### Credential File Format
 
-Use shell export format (source-able):
+Two naming conventions are in use. Both are accepted:
 
-```bash
-export JIRA_BASE_URL="https://jira.pl.grupa.iti"
-export JIRA_TOKEN="Bearer ..."
-```
+| Name | Format | Example |
+|------|--------|---------|
+| `credentials` | shell exports, source-able | `export JIRA_TOKEN="Bearer ..."` |
+| `<service>.properties` | key=value | `jira.properties`, `newrelic.properties` |
+| `cookie` | raw session cookie | ServiceNow CHG API |
 
-Usage: `source worklog/interface/jira/credentials`
+Usage: `source worklog/interface/jira/credentials`, or read `jira.properties` per the
+consuming script's convention. Never print, echo, or paste the contents into a worklog.
 
 ### Per-Service Structure
 
 ```
 worklog/interface/<service>/
-├── credentials                 # export VAR=value (source-able, never commit)
+├── credentials                 # or <service>.properties / cookie — never commit
 └── <service>-info.sh           # CLI script (optional, service-specific)
 ```
 
@@ -118,12 +132,12 @@ worklog/interface/<service>/
 
 | Service | Folder | Credentials | Script | Notes |
 |---------|--------|-------------|--------|-------|
-| JIRA + Tempo | `jira/` | `credentials` (JIRA_BASE_URL, JIRA_TOKEN) | `jira-ticket-info.sh` (5 modes: summary, ticket, rejected, tempo, verify) | Primary ticket interface |
-| New Relic | `newrelic/` | `credentials` (NR_API_KEY, NR_ACCOUNT_ID) | `newrelic-info.sh` (6 modes: apps, app, hosts, deployments, alerts, violations) | Monitoring investigations |
+| JIRA + Tempo | `jira/` | `jira.properties` or `credentials` | `jira-ticket-info.sh` (5 modes: summary, ticket, rejected, tempo, verify) | Primary ticket interface |
+| New Relic | `newrelic/` | `newrelic.properties` or `credentials` | `newrelic-info.sh` (6 modes: apps, app, hosts, deployments, alerts, violations) | Monitoring investigations |
 | AWS | `aws/` | Profile files (export AWS_PROFILE=...) | — | One file per account/role (cue-stage, cue-prod, konto-prod) |
 | EKS | `eks/` | Context files (export KUBECONFIG=... or context name) | — | One file per cluster (konto, cue) |
-| Jenkins | `jenkins/` | `credentials` (JENKINS_URL, JENKINS_USER, JENKINS_TOKEN) | — | Build triggers, job config |
-| GitHub | `github/` | `credentials` (GH_TOKEN) | — | gh CLI, API calls |
+| Jenkins | `jenkins/` | `jenkins.properties` or `credentials` | — | Build triggers, job config |
+| GitHub | `github/` | `github.properties` or `credentials` (GH_TOKEN) | — | gh CLI, API calls |
 | Argo CD | `argocd/` | `credentials` (ARGOCD_SERVER, ARGOCD_AUTH_TOKEN) | — | GitOps sync status |
 | Artifactory | `artifactory/` | `credentials` (ARTIFACTORY_URL, ARTIFACTORY_TOKEN) | — | Artifact version queries |
 | SSH | `ssh/` | Config files per environment (cue-stage, cue-prod) | — | Jump host configs, ProxyJump |
@@ -134,6 +148,8 @@ worklog/interface/<service>/
 
 - All credential files MUST be in `.gitignore` — never commit tokens.
 - Reference credentials in worklogs by path only: "source worklog/interface/jira/credentials"
+- Never open, print, or echo a credential file to read its values. Pass the path to the
+  consuming script.
 - Scripts may be committed; credentials never.
 
 ## Worklog Template Structure

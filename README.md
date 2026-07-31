@@ -73,8 +73,21 @@ mklink /J C:\Users\YOUR_PROFILE\.gemini\.agent\skills X:\repositories\ai-vault\s
 macOS/Linux:
 ```
 VAULT=/absolute/path/to/ai-vault
-ln -s "$VAULT/skills" ~/.cursor/skills
-ln -s "$VAULT/skills" ~/.agent/skills
+ln -s "$VAULT/skills" ~/.cursor/skills      # Cursor
+ln -s "$VAULT/skills" ~/.agent/skills       # AntiGravity
+ln -s "$VAULT/skills" ~/.claude/skills      # Claude Code
+```
+
+Claude Code reads the same `SKILL.md` frontmatter as Cursor and AntiGravity
+(`name`, `description`, optional `version`), so no per-host variant is needed.
+It also supports project-scoped skills at `<project>/.claude/skills/` if you want
+the vault active in one repository rather than globally.
+
+Verify each link resolves into the vault:
+```
+for p in ~/.cursor/skills ~/.agent/skills ~/.claude/skills; do
+  printf '%-20s -> %s\n' "$p" "$(readlink -f "$p" 2>/dev/null || echo ABSENT)"
+done
 ```
 
 ### Rules
@@ -90,6 +103,10 @@ VAULT=/absolute/path/to/ai-vault
 ln -s "$VAULT/.rules" ~/YOUR_WORKSPACE/.rules
 ln -s "$VAULT/.rules" ~/.agent/.rules
 ```
+
+Claude Code does not read `.rules`; its equivalent is `CLAUDE.md` at the project or
+user level. This repository does not ship one. Under Claude Code the mode protocol
+comes from the `developer-protocol` skill instead.
 
 ## Validation
 

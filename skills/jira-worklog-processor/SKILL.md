@@ -38,18 +38,29 @@ For full interaction details, see the master [Cross-Skill Integration Guide](../
 Required in the workspace (NOT in ai-vault — workspace-specific):
 
 ```
+worklog/                                # Active worklog files
 worklog/done/                           # Archive for completed tickets
-worklog/interface/                      # Service connectivity hub
-worklog/interface/jira/credentials      # JIRA + Tempo tokens (never commit)
-worklog/interface/jira/jira-ticket-info.sh  # JIRA CLI (5 modes)
-worklog/interface/newrelic/credentials  # NR API keys (never commit)
-worklog/interface/newrelic/newrelic-info.sh  # NR CLI (6 modes)
-worklog/interface/aws/                  # AWS profile files per account
-worklog/interface/eks/                  # EKS context files per cluster
-worklog/interface/snow/cookie           # ServiceNow session cookie
+worklog/interface/                      # Service connectivity hub (11 services)
+worklog/interface/jira/                 #   jira-ticket-info.sh (5 modes) + credentials
+worklog/interface/newrelic/             #   newrelic-info.sh (6 modes) + credentials
+worklog/interface/aws/                  #   AWS profile files per account
+worklog/interface/eks/                  #   EKS context files per cluster
+worklog/interface/jenkins/              #   Jenkins credentials
+worklog/interface/github/               #   GitHub tokens
+worklog/interface/argocd/               #   Argo CD credentials
+worklog/interface/artifactory/          #   Artifactory credentials
+worklog/interface/ssh/                  #   SSH configs / jump hosts
+worklog/interface/snow/                 #   ServiceNow session cookie
+worklog/interface/datadog/              #   Datadog API keys
 zzzrecycle/monitor_commands.txt         # kubectl diagnostic patterns
+tmp/                                    # Per-ticket scratch artifacts
 prompt.log                              # Session audit trail (append-only)
 ```
+
+Credential files are never committed and never read for their values. If
+`worklog/interface/` is absent, the workspace predates this layout — run
+`ai-vault/scripts/setup-workspace-interface.sh <workspace> --dry-run` first.
+See [worklog-reference.md](worklog-reference.md) § "Interface Directory".
 
 The `ticket-pickup.prompt` template ships with this skill at [ticket-pickup.prompt](ticket-pickup.prompt).
 

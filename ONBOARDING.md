@@ -22,9 +22,20 @@ git clone https://github.com/<org>/ai-vault.git
 cd ai-vault
 
 VAULT="$(pwd)"
-ln -s "$VAULT/skills" ~/.cursor/skills
-ln -s "$VAULT/skills" ~/.agent/skills
+ln -s "$VAULT/skills" ~/.cursor/skills      # Cursor
+ln -s "$VAULT/skills" ~/.agent/skills       # AntiGravity
+ln -s "$VAULT/skills" ~/.claude/skills      # Claude Code
 ln -s "$VAULT/.rules" ~/.agent/.rules
+```
+
+Claude Code reads the same `SKILL.md` frontmatter, so one symlink is all it needs.
+It does not read `.rules` — its equivalent is `CLAUDE.md`, which this repo does not
+ship; under Claude Code the mode protocol comes from the `developer-protocol` skill.
+
+If the workspace predates the `worklog/interface/` layout, run:
+```
+./scripts/setup-workspace-interface.sh /path/to/workspace --dry-run
+./scripts/setup-workspace-interface.sh /path/to/workspace --link
 ```
 
 ### Understanding the Structure
@@ -245,9 +256,24 @@ Transition only on explicit `MODE: <name>` from user.
 
 ### Skills Not Loading
 
-- Verify the symlinks resolve: `readlink -f ~/.agent/skills` and `readlink -f ~/.cursor/skills` must point inside the vault. A relative `ln -s` target yields a dangling link.
+- Verify each symlink resolves **into this vault**, not into an older clone:
+  ```
+  for p in ~/.cursor/skills ~/.agent/skills ~/.claude/skills; do
+    printf '%-20s -> %s\n' "$p" "$(readlink -f "$p" 2>/dev/null || echo ABSENT)"
+  done
+  ```
+  A relative `ln -s` target yields a dangling link. A link pointing at a *different*
+  clone is worse: the host loads stale skills and every edit here appears to have no
+  effect. Confirm with `git -C "$(readlink -f ~/.cursor/skills)/.." log --oneline -1`
+  that the HEAD matches this repository.
 - Check that each skill's `SKILL.md` is present and readable
 - Run `scripts/validate-skills.sh`; a `name` that does not match its directory prevents the skill from resolving
+
+### Tool Paths Not Found
+
+Skills reference `worklog/interface/<service>/`. If the workspace still has service
+folders at its root, run `scripts/setup-workspace-interface.sh <workspace> --link`.
+Verify with `ls -l <workspace>/worklog/interface/`.
 
 ### Worklog Template Out of Sync with SKILL.md
 
