@@ -9,42 +9,55 @@ Welcome to **AI Vault**, the single-repo platform for multi-agent workflow autom
 ### Prerequisites
 
 - **Git** (2.x+)
-- **Java 25+** (for Groovy/Java tooling)
-- **Node.js 20+** (for MCP daemon & JS utilities)
-- **Docker / Docker Compose** (optional, for local service testing)
+- **JDK 17** — required by the Jenkins syntax check. JDK 18 and newer break it: Groovy 3.x cannot read their class files.
+- **Groovy 3.x** — for `syntax_check.groovy`
 - **GitHub CLI (`gh`)** — for PR reviews and ticket workflows
 
 ### First Steps
 
+Symlink targets must be absolute paths; a relative target produces a dangling link.
+
 ```bash
-# Clone the repository
 git clone https://github.com/<org>/ai-vault.git
 cd ai-vault
 
-# Set up skills symlinks (see README.md § Symlink Setup)
-ln -s ./skills ~/.cursor/skills
-ln -s ./skills ~/.agent/skills
-ln -s ./rules/.rules ~/.agent/.rules
+VAULT="$(pwd)"
+ln -s "$VAULT/skills" ~/.cursor/skills
+ln -s "$VAULT/skills" ~/.agent/skills
+ln -s "$VAULT/.rules" ~/.agent/.rules
 ```
 
 ### Understanding the Structure
 
+Symlinks live outside the repository, in your agent host's config directory. They are
+not repo contents.
+
 ```
+~/.cursor/skills   → <vault>/skills        (Cursor)
+~/.agent/skills    → <vault>/skills        (AntiGravity)
+~/.agent/.rules    → <vault>/.rules
+
 ai-vault/
-├── .agent/skills                 ← symlink → skills/
-├── .cursor/skills                ← symlink → skills/
 ├── skills/                       ← single truth for SKILLS
+│   ├── CROSS_SKILL_INTEGRATION.md ← handoff contracts between skills
 │   ├── developer-protocol/       ← RESEARCH→INNOVATE→PLAN→EXECUTE
 │   ├── devops-daily-protocol/    ← Day Start→Pickup→Investigation→Done→Day End
 │   │   └── SKILL.md              ← workflow + tool contracts
 │   ├── jenkins-pipeline-architect/ ← CI/CD pipelines, JIRA notifications
-│   │   └── syntax_check.groovy   ← pipeline validation script
+│   │   ├── SKILL.md
+│   │   ├── references/
+│   │   │   └── pipeline-patterns.md
+│   │   └── scripts/
+│   │       ├── syntax_check.sh   ← macOS/Linux entry point (resolves JDK 17)
+│   │       └── syntax_check.groovy
 │   └── jira-worklog-processor/   ← content generation patterns
 │       ├── SKILL.md              ← worklog structure, FINDINGS/SOLUTIONS format
 │       ├── ticket-pickup.prompt  ← static template (read-only)
 │       └── examples.md           ← completed-ticket walkthroughs
+├── scripts/validate-skills.sh    ← repo integrity checks
 ├── .rules                         ← single truth for Rules
-└── README.md                      ← this file
+├── .gitignore                     ← excludes credentials and session artifacts
+└── README.md                      ← project overview
 ```
 
 ---
@@ -88,18 +101,23 @@ When multiple skills are active, `devops-daily-protocol` governs *when* and *how
 
 After initial setup, your workspace should look like:
 
+The repository holds only skills, rules, and tooling. The `worklog/`, `tmp/`,
+`zzzrecycle/`, and `prompt.log` paths below live in your working workspace, not in
+this repository, and are excluded by `.gitignore`.
+
 ```
 ai-vault/
-├── .agent/skills                 ← symlink → skills/
-├── .cursor/skills                ← symlink → skills/
 ├── skills/                       ← single truth for SKILLS
+│   ├── CROSS_SKILL_INTEGRATION.md
 │   ├── developer-protocol/
 │   │   └── SKILL.md
 │   ├── devops-daily-protocol/    ← workflow + tool contracts
 │   │   └── SKILL.md
 │   ├── jenkins-pipeline-architect/
 │   │   ├── SKILL.md
+│   │   ├── references/pipeline-patterns.md
 │   │   └── scripts/
+│   │       ├── syntax_check.sh
 │   │       └── syntax_check.groovy
 │   └── jira-worklog-processor/   ← content generation patterns
 │       ├── SKILL.md
@@ -107,10 +125,12 @@ ai-vault/
 │       ├── worklog.template      ← worklog scaffold
 │       ├── examples.md           ← completed-ticket walkthroughs
 │       └── worklog-reference.md  ← section specifications
+├── scripts/validate-skills.sh    ← repo integrity checks
 ├── .rules                         ← single truth for Rules
-├── README.md                      ← this file
+├── .gitignore
+├── README.md                      ← project overview
+├── CONTRIBUTING.md                ← contribution guide
 ├── VERSIONING.md                  ← versioning policy
-├── plan.md                        ← current project plan
 ├── worklog/
 │   ├── done/                       ← archive for completed tickets
 │   └── interface/                  ← service connectivity hub
@@ -134,7 +154,7 @@ ai-vault/
 | `worklog.template` | `skills/jira-worklog-processor/` | User-maintained | Worklog scaffold — sync with SKILL.md structure |
 | `examples.md` | `skills/jira-worklog-processor/` | Community | Completed-ticket walkthroughs for reference |
 | `.rules` | Root | All contributors | Single truth for project rules |
-| `prompt.log` | Root | System | Session audit trail — append-only, never edit manually |
+| `prompt.log` | Workspace root | System | Session audit trail — append-only, never edit manually, never committed |
 
 ---
 
@@ -142,9 +162,10 @@ ai-vault/
 
 ### Code Changes
 
-- **Java/Groovy**: Use `gitAdd` + `gitCommit`. Follow the Write Gate Protocol for any file creation/editing.
-- **Python/Node.js**: Standard git workflow with PR reviews.
-- **Jenkins Pipelines**: Run `skills/jenkins-pipeline-architect/scripts/syntax_check.groovy` before committing.
+- Follow the Write Gate Protocol for any file creation or editing.
+- The agent never commits or pushes. After changes are applied it proposes a semantic commit title and description; you run the git commands.
+- **Jenkins Pipelines**: run `skills/jenkins-pipeline-architect/scripts/syntax_check.sh` before committing.
+- **Any skill or rule change**: run `scripts/validate-skills.sh` before committing.
 
 ### Worklog Changes
 
@@ -189,8 +210,8 @@ When a PR is merged:
 
 | Operation | Allowed | Notes |
 |-----------|---------|-------|
-| JIRA CLI (`jira/jira-ticket-info.sh`) | Always | 5 modes: `summary`, `<KEY>`, `rejected`, `tempo [DATE]`, `verify [DATE]` |
-| NR CLI (`newrelic/newrelic-info.sh`) | Always | 6 modes: `apps`, `app <ID>`, `hosts <ID>`, `deployments <ID>`, `alerts <ID>`, `violations` |
+| JIRA CLI (`worklog/interface/jira/jira-ticket-info.sh`) | Always | 5 modes: `summary`, `<KEY>`, `rejected`, `tempo [DATE]`, `verify [DATE]` |
+| NR CLI (`worklog/interface/newrelic/newrelic-info.sh`) | Always | 6 modes: `apps`, `app <ID>`, `hosts <ID>`, `deployments <ID>`, `alerts <ID>`, `violations` |
 | File reads | Always | No restrictions |
 | kubectl (read-only) | Always | Use patterns from `zzzrecycle/monitor_commands.txt` |
 
@@ -198,7 +219,10 @@ When a PR is merged:
 
 - `worklog/interface/jira/credentials` — JIRA + Tempo tokens
 - `worklog/interface/newrelic/credentials` — NR API keys
-- `.gitignore` should exclude all credential files
+
+The repository `.gitignore` already excludes `**/credentials`, `**/*.properties`,
+`**/cookie`, `worklog/`, `tmp/`, `prompt.log`, and `PR.log`. Verify with
+`git check-ignore -v <path>` before adding any file that may carry a secret.
 
 ---
 
@@ -221,23 +245,22 @@ Transition only on explicit `MODE: <name>` from user.
 
 ### Skills Not Loading
 
-- Verify symlinks exist: `.agent/skills` → `skills/`, `.cursor/skills` → `skills/`
+- Verify the symlinks resolve: `readlink -f ~/.agent/skills` and `readlink -f ~/.cursor/skills` must point inside the vault. A relative `ln -s` target yields a dangling link.
 - Check that each skill's `SKILL.md` is present and readable
+- Run `scripts/validate-skills.sh`; a `name` that does not match its directory prevents the skill from resolving
 
 ### Worklog Template Out of Sync with SKILL.md
 
 - Read `skills/jira-worklog-processor/SKILL.md` for current section structure
 - Update `worklog.template` to match
-- Run `gitAdd . && gitCommit -m "sync worklog.template with jira-worklog-processor/SKILL.md"`
+- Commit the change yourself with a semantic message; the agent proposes it but never commits
 
 ### JIRA CLI Not Found
 
 ```bash
-# Ensure the script is executable
 chmod +x worklog/interface/jira/jira-ticket-info.sh
-
-# Test a query
-./worklog/interface/jira/jira-ticket-info.sh summary KD-1234
+./worklog/interface/jira/jira-ticket-info.sh summary
+./worklog/interface/jira/jira-ticket-info.sh KD-1234
 ```
 
 ---
@@ -248,14 +271,12 @@ chmod +x worklog/interface/jira/jira-ticket-info.sh
 |----------|---------------|
 | How to structure a worklog? | `skills/jira-worklog-processor/SKILL.md` + `worklog.template` |
 | PR review process? | `skills/jira-worklog-processor/SKILL.md` § PR Review Workflow |
-| Jenkins pipeline syntax? | `skills/jenkins-pipeline-architect/scripts/syntax_check.groovy` |
+| Jenkins pipeline syntax? | `skills/jenkins-pipeline-architect/SKILL.md` + `references/pipeline-patterns.md` |
 | Mode transitions? | `skills/developer-protocol/SKILL.md` |
-| Cross-skill integration? | `CROSS_SKILL_INTEGRATION.md` |
+| Cross-skill integration? | `skills/CROSS_SKILL_INTEGRATION.md` |
 
 ---
 
 ## 10. License & Attribution
 
-This project is governed by the rules in `.rules`. See `VERSIONING.md` for versioning policy and `CROSS_SKILL_INTEGRATION.md` for data flows between skills.
-
-Thank you for contributing to AI Vault! 🚀
+This project is governed by the rules in `.rules`. See `VERSIONING.md` for versioning policy and `skills/CROSS_SKILL_INTEGRATION.md` for data flows between skills.

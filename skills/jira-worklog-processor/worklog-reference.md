@@ -651,24 +651,11 @@ repos/ai-vault/
 └─────────────────────────────────────────────────┘
 ```
 
-### Deployment Options
-
-**Option A — Workspace-local (current)**:
-Keep in `tmp/worklog_skill/`. Available only in this workspace.
-
-**Option B — Personal skill**:
-Copy to `~/.cursor/skills/jira-worklog-processor/`. Available across all projects.
-
-**Option C — Add to ai-vault**:
-Add `skills/jira-worklog-processor/` to `repos/ai-vault/`. Version-controlled,
-shared via symlinks to both Cursor and other agents. Canonical source of truth.
-
 ### .rules Overlap
 
-The ai-vault `.rules` file contains rules that overlap with Cursor user rules:
-- Append-only `prompt.log` (rules 2)
-- Write-before-merge discipline (top rule)
-- Developer protocol modes (rule 4)
-- Systematic debugging (rule 5)
+The ai-vault `.rules` file contains rules that reinforce this skill:
+- Write-before-merge discipline and append-only `prompt.log` (rule 1)
+- Developer protocol modes (rule 3, delegating to `skills/developer-protocol/SKILL.md`)
+- Systematic debugging (rule 4)
 
 These reinforce the same behaviors this skill depends on. No conflicts.

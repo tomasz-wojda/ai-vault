@@ -1,6 +1,11 @@
 ---
 name: devops-daily-protocol
-description: Orchestrates daily DevOps operations: pulling JIRA tickets, selecting work items, creating structured worklog files, integrating New Relic monitoring, and managing Tempo time logging. Use when starting a work day, picking up a ticket, investigating issues, finishing ticket work, or logging time.
+version: "1.0.0"
+description: >-
+  Orchestrates daily DevOps operations: pulling JIRA tickets, selecting work items,
+  creating structured worklog files, integrating New Relic monitoring, and managing
+  Tempo time logging. Use when starting a work day, picking up a ticket,
+  investigating issues, finishing ticket work, or logging time.
 ---
 
 # DevOps Daily Protocol
@@ -22,30 +27,34 @@ Read operations (always allowed without approval):
 After every interaction, append a summary to `prompt.log` (see Prompt Logging section).
 
 ## Available Tools
-All paths are relative to the workspace root.
+All paths are relative to the workspace root. `worklog/interface/` is the canonical
+service hub: every external service has one subfolder holding its `credentials` file
+and, where applicable, its CLI script. See
+[worklog-reference.md](../jira-worklog-processor/worklog-reference.md) § "Interface Directory"
+for the full service inventory.
 
 ### JIRA CLI
-**Path**: `jira/jira-ticket-info.sh`
+**Path**: `worklog/interface/jira/jira-ticket-info.sh`
 
 | Mode | Command | Purpose |
 |------|---------|---------|
-| summary | `jira/jira-ticket-info.sh summary` | Board overview: in-progress, blocked, to-do, recently completed |
-| ticket | `jira/jira-ticket-info.sh <KEY>` | Full ticket detail: fields, description, comments, worklogs, assignment |
-| rejected | `jira/jira-ticket-info.sh rejected` | List rejected (Odrzucone) tickets |
-| tempo | `jira/jira-ticket-info.sh tempo [YYYY-MM-DD]` | Daily Tempo timesheet entries (defaults to today) |
-| verify | `jira/jira-ticket-info.sh verify [YYYY-MM-DD]` | Compare local worklog/ files against Tempo entries |
+| summary | `worklog/interface/jira/jira-ticket-info.sh summary` | Board overview: in-progress, blocked, to-do, recently completed |
+| ticket | `worklog/interface/jira/jira-ticket-info.sh <KEY>` | Full ticket detail: fields, description, comments, worklogs, assignment |
+| rejected | `worklog/interface/jira/jira-ticket-info.sh rejected` | List rejected (Odrzucone) tickets |
+| tempo | `worklog/interface/jira/jira-ticket-info.sh tempo [YYYY-MM-DD]` | Daily Tempo timesheet entries (defaults to today) |
+| verify | `worklog/interface/jira/jira-ticket-info.sh verify [YYYY-MM-DD]` | Compare local worklog/ files against Tempo entries |
 
 ### New Relic CLI
-**Path**: `newrelic/newrelic-info.sh`
+**Path**: `worklog/interface/newrelic/newrelic-info.sh`
 
 | Mode | Command | Purpose |
 |------|---------|---------|
-| apps | `newrelic/newrelic-info.sh apps` | All applications with health status and metrics |
-| app | `newrelic/newrelic-info.sh app <ID>` | Single application detail |
-| hosts | `newrelic/newrelic-info.sh hosts <ID>` | Hosts for an application |
-| deployments | `newrelic/newrelic-info.sh deployments <ID>` | Deployment history for an application |
-| alerts | `newrelic/newrelic-info.sh alerts <ID>` | Alert conditions targeting an application |
-| violations | `newrelic/newrelic-info.sh violations` | All open alert violations |
+| apps | `worklog/interface/newrelic/newrelic-info.sh apps` | All applications with health status and metrics |
+| app | `worklog/interface/newrelic/newrelic-info.sh app <ID>` | Single application detail |
+| hosts | `worklog/interface/newrelic/newrelic-info.sh hosts <ID>` | Hosts for an application |
+| deployments | `worklog/interface/newrelic/newrelic-info.sh deployments <ID>` | Deployment history for an application |
+| alerts | `worklog/interface/newrelic/newrelic-info.sh alerts <ID>` | Alert conditions targeting an application |
+| violations | `worklog/interface/newrelic/newrelic-info.sh violations` | All open alert violations |
 
 ### Monitoring References
 - **kubectl patterns**: `zzzrecycle/monitor_commands.txt` — read this file for cluster diagnostic commands
@@ -77,19 +86,19 @@ Five modes triggered by user intent. Detect the appropriate mode from context.
 ### MODE: Day Start
 Trigger: user starts work, asks "what should I work on", or requests ticket overview.
 Steps:
-1. Run `jira/jira-ticket-info.sh summary` to pull current board state
-2. Run `jira/jira-ticket-info.sh tempo` to check hours already logged today
+1. Run `worklog/interface/jira/jira-ticket-info.sh summary` to pull current board state
+2. Run `worklog/interface/jira/jira-ticket-info.sh tempo` to check hours already logged today
 3. Present ticket overview grouped by board column
 4. Suggest which ticket to pick up next, prioritizing by:
    - Priority field (Wysoki > Sredni > Niski)
    - Ticket age (older unresolved tickets first)
    - Blocked tickets (flag but skip for pickup)
-5. If there are open NR violations, mention them: run `newrelic/newrelic-info.sh violations`
+5. If there are open NR violations, mention them: run `worklog/interface/newrelic/newrelic-info.sh violations`
 
 ### MODE: Ticket Pickup
 Trigger: user selects a ticket to work on, or says "pick up TICKET-KEY".
 Steps:
-1. Run `jira/jira-ticket-info.sh <TICKET-KEY>` to fetch full ticket detail
+1. Run `worklog/interface/jira/jira-ticket-info.sh <TICKET-KEY>` to fetch full ticket detail
 2. Parse the output to extract: key, summary, status, type, priority, project, assignee, reporter, components, created, updated, description
 3. Check if `worklog/done/*_TICKET-KEY*.log` exists (reopened ticket detection)
    - If found: inform user "Previous worklog found in `done/` for this ticket: [list files]. Copy back to `worklog/`?"
@@ -140,11 +149,11 @@ Trigger: user is actively working on a ticket — researching, querying, analyzi
 This mode supports the user during active investigation. Use tools as needed:
 
 **New Relic investigation patterns**:
-- Open violations: `newrelic/newrelic-info.sh violations`
-- App-specific alerts: `newrelic/newrelic-info.sh alerts <APP_ID>`
-- App health overview: `newrelic/newrelic-info.sh apps` then `app <ID>`
-- Host inspection: `newrelic/newrelic-info.sh hosts <APP_ID>`
-- Recent deployments: `newrelic/newrelic-info.sh deployments <APP_ID>`
+- Open violations: `worklog/interface/newrelic/newrelic-info.sh violations`
+- App-specific alerts: `worklog/interface/newrelic/newrelic-info.sh alerts <APP_ID>`
+- App health overview: `worklog/interface/newrelic/newrelic-info.sh apps` then `app <ID>`
+- Host inspection: `worklog/interface/newrelic/newrelic-info.sh hosts <APP_ID>`
+- Recent deployments: `worklog/interface/newrelic/newrelic-info.sh deployments <APP_ID>`
 
 **Kubernetes diagnostics** (read `zzzrecycle/monitor_commands.txt` for full list):
 - Unhealthy pods: `kubectl get pods --all-namespaces | awk '$4 != "Running" && $4 != "Completed" && NR > 1'`
@@ -167,7 +176,7 @@ Steps:
    - Ask the user for their estimate, OR
    - Propose an estimate based on worklog complexity and session context
    - Time must be in seconds for the API (1h = 3600, 30m = 1800)
-3. Run `jira/jira-ticket-info.sh tempo` to show current day's logged hours
+3. Run `worklog/interface/jira/jira-ticket-info.sh tempo` to show current day's logged hours
 4. **WRITE GATE**: Propose Tempo time logging. Show the exact operation:
    - Method: POST
    - URL: `https://jira.pl.grupa.iti/rest/tempo-timesheets/3/worklogs`
@@ -183,7 +192,7 @@ Steps:
      ```
    - Present the payload with actual values filled in
 5. After approval, execute the POST request
-6. Run `jira/jira-ticket-info.sh verify` to confirm the entry appears in Tempo
+6. Run `worklog/interface/jira/jira-ticket-info.sh verify` to confirm the entry appears in Tempo
 7. Present verification result
 8. **WRITE GATE**: Propose moving worklog files to `done/` subfolder
    - Identify all files matching `worklog/*_TICKET-KEY*.log` (glob on ticket key)
@@ -194,8 +203,8 @@ Steps:
 ### MODE: Day End
 Trigger: user ends their day, asks for daily summary, or wants to verify logged hours.
 Steps:
-1. Run `jira/jira-ticket-info.sh verify` to compare worklog files vs Tempo for today
-2. Run `jira/jira-ticket-info.sh tempo` to show total hours logged today
+1. Run `worklog/interface/jira/jira-ticket-info.sh verify` to compare worklog files vs Tempo for today
+2. Run `worklog/interface/jira/jira-ticket-info.sh tempo` to show total hours logged today
 3. Analyze the output:
    - **MATCHED**: worklog file exists AND Tempo entry exists — no action needed
    - **MISSING FROM TEMPO**: worklog file exists but no hours logged — flag for action, offer to log via Ticket Done mode
@@ -235,70 +244,6 @@ Every non-read operation MUST follow this protocol:
 4. **EXECUTE**: Only after the user confirms with approval.
 5. **VERIFY**: Confirm the operation succeeded (re-read file or re-run command).
 
-## IMP-01: Standardized Preview Format (Enhanced)
-The Write Gate Protocol above defines a unified, consistent preview format for all non-read operations. Key improvements over the original:
-
-1. **Explicit file previews** — New/overwrite files are shown with filename header in fenced code blocks
-2. **Unified diff format** — Edits use standard `---`/`+++`/`@@` syntax for efficient review
-3. **Compact API call format** — `[METHOD] URL | Payload: {JSON_SUMMARY}` with token redaction guidance
-4. **CLI/Git commands shown verbatim** — Exact command and target files listed clearly
-5. **Consistent 5-step flow** — ANNOUNCE → PREVIEW → WAIT → EXECUTE → VERIFY applies uniformly to all operation types
-
-### IMP-01A: Smart Preview Generation (Innovation)
-Enhance the preview with a natural language summary alongside technical details:
-
-```
-# File: worklog/2026-03-07_DEVOPS-123.log
-SUMMARY: Adding 3 findings to FINDINGS section and updating PROPOSED SOLUTIONS
-DIFF:
---- worklog/2026-03-07_DEVOPS-123.log
-+++ worklog/2026-03-07_DEVOPS-123.log
-@@ -5,8 +5,14 @@
-   FINDINGS
-===============================================================================
-
-  1. Found OOMKilled in pod xyz
-===============================================================================
-  2. Zoltan alert triggered on Solr cluster (severity: critical)
-  3. Verified deployment v2.3.1 caused the issue
-===============================================================================
-```
-
-### IMP-01B: Confidence Scoring
-Add confidence scores to proposed changes based on certainty level:
-
-| Confidence | Meaning | Action Required |
-|------------|---------|-----------------|
-| 🔴 HIGH (≥95%) | Certain, no ambiguity | Proceed immediately after confirmation |
-| 🟡 MEDIUM (60-89%) | Likely correct, minor uncertainty | Show additional context before proceeding |
-| 🟢 LOW (<60%) | Uncertain, may need validation | Require explicit user review of source data |
-
-### IMP-01C: Impact Classification
-Classify each proposed change by potential impact:
-
-| Risk Level | Description | Examples |
-|------------|-------------|----------|
-| 🔵 LOW | No side effects, reversible | Adding a finding to worklog, updating action log |
-| 🟢 MEDIUM | Affects one file, minor changes | Modifying PROPOSED SOLUTIONS section |
-| 🟠 HIGH | Multiple files or complex changes | Moving multiple worklogs to done/, bulk API operations |
-
-### IMP-01D: Preview Caching
-Cache recent previews for repeated operation types to reduce latency:
-- Cache key: `{operation_type}:{file_path_hash}`
-- TTL: 5 minutes (worklog content rarely changes within a session)
-- On cache miss: regenerate and store for future reference
-
-### IMP-01E: Interactive Preview Mode
-Allow the user to "zoom in" on specific sections of a preview:
-```
-PREVIEW: worklog/2026-03-07_DEVOPS-123.log
-  - SHOW: FINDINGS section only
-  - SHOW: PROPOSED SOLUTIONS section only
-  - SHOW: ACTION LOG section only
-  - SHOW: FULL diff
-  - SHOW: SUMMARY + diff (default)
-```
-
 ## Worklog File Conventions
 ### Naming
 ```
@@ -330,7 +275,7 @@ All worklog files follow the `skills/jira-worklog-processor/worklog.template` st
 | ACTION LOG | Chronological record of actions taken during the session |
 
 ### tickets.log
-The file `worklog/tickets.log` stores the latest output from `jira/jira-ticket-info.sh summary`. Overwrite it each time summary is run at day start.
+The file `worklog/tickets.log` stores the latest output from `worklog/interface/jira/jira-ticket-info.sh summary`. Overwrite it each time summary is run at day start.
 
 ## Prompt Logging
 After every interaction, append to `prompt.log` at the workspace root:
@@ -361,12 +306,12 @@ TAB 2: <tab description>
 ### Investigation Decision Tree
 | Need | Command |
 |------|---------|
-| Check for active incidents | `newrelic/newrelic-info.sh violations` |
-| Find alert conditions for an app | `newrelic/newrelic-info.sh alerts <APP_ID>` |
-| Check app health and metrics | `newrelic/newrelic-info.sh app <APP_ID>` |
-| List all apps to find an ID | `newrelic/newrelic-info.sh apps` |
-| Check which hosts serve an app | `newrelic/newrelic-info.sh hosts <APP_ID>` |
-| Check recent deployments | `newrelic/newrelic-info.sh deployments <APP_ID>` |
+| Check for active incidents | `worklog/interface/newrelic/newrelic-info.sh violations` |
+| Find alert conditions for an app | `worklog/interface/newrelic/newrelic-info.sh alerts <APP_ID>` |
+| Check app health and metrics | `worklog/interface/newrelic/newrelic-info.sh app <APP_ID>` |
+| List all apps to find an ID | `worklog/interface/newrelic/newrelic-info.sh apps` |
+| Check which hosts serve an app | `worklog/interface/newrelic/newrelic-info.sh hosts <APP_ID>` |
+| Check recent deployments | `worklog/interface/newrelic/newrelic-info.sh deployments <APP_ID>` |
 | Audit NR config on a remote host | Read `zzzrecycle/nr-audit.sh`, run on target host via SSH |
 
 ### Common NRQL Patterns
@@ -388,21 +333,3 @@ Read `zzzrecycle/monitor_commands.txt` for the full command reference. Key comma
 | HPA status | `kubectl get hpa -n <NS>` |
 | Failure events | `kubectl get events --all-namespaces --sort-by='.lastTimestamp' \| grep -iE "not ready\|unhealthy\|back-off\|failed" \| tail -20` |
 | Container limits | `kubectl get deployment <NAME> -n <NS> -o jsonpath='{.spec.template.spec.containers[0].resources}' \| python3 -m json.tool` |
-
-## IMP-01: Standardized Preview Format (Implemented)
-The Write Gate Protocol above defines a unified, consistent preview format for all non-read operations. Key improvements over the original:
-1. **Explicit file previews** — New/overwrite files are shown with filename header in fenced code blocks
-2. **Unified diff format** — Edits use standard `---`/`+++`/`@@` syntax for efficient review
-3. **Compact API call format** — `[METHOD] URL | Payload: {JSON_SUMMARY}` with token redaction guidance
-4. **CLI/Git commands shown verbatim** — Exact command and target files listed clearly
-5. **Consistent 5-step flow** — ANNOUNCE → PREVIEW → WAIT → EXECUTE → VERIFY applies uniformly to all operation types
-
-This standardization ensures that every write gate follows the same predictable pattern, reducing cognitive load and preventing inconsistent previews across different operation types.
-
---- END IMP-01 IMPLEMENTATION ---
-```
-
-<tool_call>
-<function=gitAdd>
-<parameter=files>
-["skills/devops-daily-protocol/SKILL.md"]

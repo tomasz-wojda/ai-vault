@@ -7,13 +7,16 @@ This document defines the semantic versioning strategy for all skills, templates
 ## 1. Versioning Conventions
 
 ### 1.1 SKILL.md Files
-Every skill's `SKILL.md` must include a version field at the top:
+Every skill's `SKILL.md` must carry a `version` key in its YAML frontmatter, alongside
+`name` and `description`. It is frontmatter, not a body line — `scripts/validate-skills.sh`
+reads it from there.
 
 ```markdown
-# [Skill Name]
-
-version: "1.2.0"
+---
+name: example-skill
+version: "1.0.0"
 description: Brief description of this skill...
+---
 ```
 
 **Version Semantics:**
@@ -24,96 +27,70 @@ description: Brief description of this skill...
 ### 1.2 Templates (e.g., `worklog.template`)
 Templates inherit the versioning of their parent skill but may have independent minor/patch versions when they diverge from the SKILL.md structure.
 
-```yaml
-# In worklog.template header or metadata section:
-template-version: "1.0.3"
-parent-skill-version: "2.1.0"
-```
-
 ### 1.3 Cross-Skill Integration Document
-`CROSS_SKILL_INTEGRATION.md` tracks the version of each skill it references and must be updated whenever a skill's major version changes or handoff patterns are affected.
+`skills/CROSS_SKILL_INTEGRATION.md` documents handoff contracts between skills. Update it
+whenever a skill's major version changes or a handoff pattern is added, removed, or altered.
 
-## 2. Template Compatibility Matrix
+## 2. Template Compatibility
 
-| Parent Skill Version | Compatible Template Versions | Notes |
-|---------------------|------------------------------|-------|
-| `SKILL.md` 1.x.x | `template` 1.x.x | Original structure; no breaking changes |
-| `SKILL.md` 2.0.0 | `template` 2.0.x+ | Major change: new worklog sections added; older templates may miss fields |
-| `SKILL.md` 2.1.0 | `template` 2.1.x+ | Minor change: METRICS section added; template should include it for full support |
+`worklog.template` is owned by `jira-worklog-processor`. Its section list must match the
+sections documented in that skill's `SKILL.md` and `worklog-reference.md`.
 
-**Rule:** A template version must never exceed its parent skill's major version. If the parent skill bumps to a new major, the template must be updated or deprecated.
+**Rule:** a template version must never exceed its parent skill's major version. When the
+parent skill bumps to a new major, the template is updated in the same change or explicitly
+deprecated. `worklog.template` currently carries no version header; it tracks
+`jira-worklog-processor` directly.
 
 ## 3. Migration Guide (Breaking Changes)
 
 ### When a Major Version Bump Occurs:
-1. **Publish `VERSIONING.md` update** with migration instructions.
-2. **Update all affected SKILL.md files** to reflect new version.
-3. **Create a migration script or checklist** for any required template updates.
-4. **Archive deprecated templates** in `templates/archive/` directory (if needed).
-5. **Notify contributors** via JIRA ticket referencing the migration guide.
+1. **Publish `VERSIONING.md` update** with migration instructions and the new § 6 row.
+2. **Update all affected SKILL.md files** to reflect the new frontmatter version.
+3. **Create a migration checklist** for any required template updates.
+4. **Notify contributors** via JIRA ticket referencing the migration guide.
 
 ### Example Migration Checklist:
 - [ ] Update `version:` field in all SKILL.md files
 - [ ] Review and update any template that references old sections
 - [ ] Verify backward compatibility of CLI tools with new workflow modes
 - [ ] Document deprecated fields/sections for future reference
-- [ ] Add migration notes to `CROSS_SKILL_INTEGRATION.md` if handoff patterns changed
+- [ ] Add migration notes to `skills/CROSS_SKILL_INTEGRATION.md` if handoff patterns changed
 
-## 4. Versioning in CI/CD (IMP-03.4)
+## 4. Enforcement
 
-The syntax validation pipeline should enforce:
-1. **Version field presence**: Every SKILL.md must contain a valid semantic version (`MAJOR.MINOR.PATCH`).
-2. **Template compatibility check**: Validate that template versions do not exceed parent skill major versions.
-3. **No missing versions**: Reject commits where any new SKILL.md lacks a `version:` header.
+`scripts/validate-skills.sh` enforces versioning locally. Run it before every commit that
+touches `skills/` or `.rules`. It fails when a `SKILL.md` lacks a frontmatter `version`
+matching `MAJOR.MINOR.PATCH`, and also checks frontmatter name-to-directory agreement,
+description length, link integrity, code-fence balance, and skill file size.
 
-## 5. Version History Template
+There is no CI in this repository. The script is the enforcement point.
 
-```markdown
-# [Skill Name]
+## 5. Changelog Placement
 
-version: "1.2.0"
-description: Brief description...
+Skills do not carry an inline changelog. Version history lives in git. A change that bumps
+a skill's version must state the bump in its commit description, using the semantics in
+§ 1.1.
 
-### Changelog
+## 6. Current Skill Versions
 
-#### v1.2.0 (YYYY-MM-DD)
-- **Added**: New investigation pattern for Kubernetes OOMKilled failures
-- **Fixed**: Worklog template missing METRICS section
-- **Changed**: Updated JIRA CLI command syntax
+| Skill | Version | Last Updated | Notes |
+|-------|---------|--------------|-------|
+| developer-protocol | 1.0.0 | 2026-07-31 | Canonical mode protocol; `.rules` § 3 delegates here |
+| devops-daily-protocol | 1.0.0 | 2026-07-31 | Lifecycle shell, Write Gate, tool contracts |
+| jira-worklog-processor | 1.0.0 | 2026-07-31 | Worklog content patterns, PR review workflow |
+| jenkins-pipeline-architect | 1.0.0 | 2026-07-31 | Core rules in SKILL.md, detail in `references/` |
 
-#### v1.1.0 (YYYY-MM-DD)
-- **Added**: Deployment Verification Mode documentation
-- **Bugfix**: Fixed typo in Write Gate preview format
-
-#### v1.0.0 (YYYY-MM-DD)
-- Initial release
-```
-
-## 6. Versioning for `CROSS_SKILL_INTEGRATION.md`
-
-This document tracks the version of each skill it references:
-
-| Skill | Current Version | Last Updated | Notes |
-|-------|----------------|--------------|-------|
-| developer-protocol | 1.0.0 | YYYY-MM-DD | Stable; no major changes planned |
-| devops-daily-protocol | 2.1.0 | YYYY-MM-DD | METRICS section added in v2.1.0 |
-| jira-worklog-processor | 1.5.0 | YYYY-MM-DD | Template sync with SKILL.md |
-| jenkins-pipeline-architect | 1.2.0 | YYYY-MM-DD | Syntax check script updated |
+Update this table in the same change that bumps a skill's frontmatter version.
 
 ## Appendix: Versioning Commands
 
 ```bash
-# Check version field in a skill's SKILL.md
-grep -n "^version:" skills/devops-daily-protocol/SKILL.md
+./scripts/validate-skills.sh
 
-# Validate all SKILL.md files have version fields
-find skills/ -name "SKILL.md" -exec grep -q "^version: [0-9]\.[0-9]\.[0-9]" {} \;
-
-# List all versions in the repo
-grep -r "^version:" skills/ | sort -u
+grep -rn '^version:' skills/*/SKILL.md
 ```
 
 ---
 
-*Last updated: 2026-03-07*  
+*Last updated: 2026-07-31*  
 *Maintained by: `ai-vault` repository maintainers*

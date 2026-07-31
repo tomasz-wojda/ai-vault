@@ -1,0 +1,17 @@
+prompt.log
+PR.log
+
+worklog/
+tmp/
+zzzrecycle/
+repos/
+
+**/credentials
+**/*.properties
+**/cookie
+*.pem
+*.key
+
+.cursor/
+.agent/
+.DS_Store

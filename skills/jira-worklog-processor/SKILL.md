@@ -1,5 +1,6 @@
 ---
 name: jira-worklog-processor
+version: "1.0.0"
 description: >-
   Process JIRA tickets into structured worklog files following a multi-phase
   research-first workflow. Extends devops-daily-protocol with content generation
@@ -115,8 +116,8 @@ Read operations (always allowed): JIRA CLI, NR CLI, file reads, kubectl read-onl
 
 | Tool | Path | Key Commands |
 |------|------|-------------|
-| JIRA CLI | `jira/jira-ticket-info.sh` | `summary`, `<KEY>`, `rejected`, `tempo [DATE]`, `verify [DATE]` |
-| New Relic CLI | `newrelic/newrelic-info.sh` | `apps`, `app <ID>`, `hosts <ID>`, `deployments <ID>`, `alerts <ID>`, `violations` |
+| JIRA CLI | `worklog/interface/jira/jira-ticket-info.sh` | `summary`, `<KEY>`, `rejected`, `tempo [DATE]`, `verify [DATE]` |
+| New Relic CLI | `worklog/interface/newrelic/newrelic-info.sh` | `apps`, `app <ID>`, `hosts <ID>`, `deployments <ID>`, `alerts <ID>`, `violations` |
 | Worklog template | [worklog.template](worklog.template) | Section scaffold (ships with this skill) |
 | kubectl patterns | `zzzrecycle/monitor_commands.txt` | Cluster diagnostics |
 
@@ -124,7 +125,7 @@ Read operations (always allowed): JIRA CLI, NR CLI, file reads, kubectl read-onl
 
 0. Read [ticket-pickup.prompt](ticket-pickup.prompt) template. Extract `TICKET-KEY` from user input.
    Substitute `{TICKET_KEY}` in the template. Follow all steps described in the template.
-1. Run `jira/jira-ticket-info.sh <TICKET-KEY>` to fetch full ticket detail
+1. Run `worklog/interface/jira/jira-ticket-info.sh <TICKET-KEY>` to fetch full ticket detail
 2. Parse output: key, summary, status, type, priority, project, assignee, reporter,
    components, labels, epic, created, updated, description, comments, linked issues, time spent
 3. **Reopened ticket check**: look for `worklog/done/*_<TICKET-KEY>*.log`
@@ -347,9 +348,9 @@ If no worklog is found for the ticket key (or no ticket key in the PR):
 
 1. Update STATUS to DONE
 2. Ask user for time estimate (or propose based on session complexity)
-3. Run `jira/jira-ticket-info.sh tempo` to check today's hours
+3. Run `worklog/interface/jira/jira-ticket-info.sh tempo` to check today's hours
 4. **WRITE GATE**: Log time via Tempo API
-5. Run `jira/jira-ticket-info.sh verify` to confirm
+5. Run `worklog/interface/jira/jira-ticket-info.sh verify` to confirm
 6. Update TIME LOGGED section in worklog
 7. **WRITE GATE**: Move worklog files to `worklog/done/`
 

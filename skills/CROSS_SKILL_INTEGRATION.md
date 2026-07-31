@@ -181,7 +181,7 @@ The skills are designed as a layered architecture. Each layer handles a distinct
 - **▶ Trigger:** User says "pick up TICKET-KEY" or selects ticket
 - **📤 Data:** JIRA ticket metadata (key, summary, status, type, priority, project, assignee, reporter, components, created, updated, description, comments, linked issues, time spent)
 - **Contract:**
-  1. `devops-daily-protocol` fetches ticket via `jira/jira-ticket-info.sh <KEY>`
+  1. `devops-daily-protocol` fetches ticket via `worklog/interface/jira/jira-ticket-info.sh <KEY>`
   2. Checks for reopened ticket in `worklog/done/`
   3. Hands off to `jira-worklog-processor` to create `worklog/YYYY-MM-DD_<KEY>.log` using `worklog.template`
   4. `jira-worklog-processor` pre-populates TICKET header from JIRA response
@@ -216,7 +216,7 @@ The skills are designed as a layered architecture. Each layer handles a distinct
   4. After approval: `devops-daily-protocol` executes POST, runs verify
   5. `jira-worklog-processor` updates TIME LOGGED section and STATUS to DONE
   6. `devops-daily-protocol` moves files to `worklog/done/`
-- **⚠️ Edge Case — Partial Day Work:** User worked on ticket across multiple sessions → time should aggregate. Check `jira/jira-ticket-info.sh tempo` for existing entries.
+- **⚠️ Edge Case — Partial Day Work:** User worked on ticket across multiple sessions → time should aggregate. Check `worklog/interface/jira/jira-ticket-info.sh tempo` for existing entries.
 
 #### P-23: Day End Handoff — Verification
 - **▶ Trigger:** User ends day or requests daily summary
@@ -261,7 +261,7 @@ The skills are designed as a layered architecture. Each layer handles a distinct
 #### P-28: NR Alert → Build Correlation
 - **▶ Trigger:** NR violation detected during or after a Jenkins deployment
 - **📤 Data:** NR alert data, recent deployment history
-- **Contract:** `devops-daily-protocol` runs `newrelic/newrelic-info.sh violations` and `deployments <APP_ID>`. If a deployment correlates temporally with the alert, hands off to `jenkins-pipeline-architect` to inspect the deployment pipeline.
+- **Contract:** `devops-daily-protocol` runs `worklog/interface/newrelic/newrelic-info.sh violations` and `deployments <APP_ID>`. If a deployment correlates temporally with the alert, hands off to `jenkins-pipeline-architect` to inspect the deployment pipeline.
 - **⚠️ Edge Case — False Correlation:** Deployment and alert coincide but are unrelated. Agent should note correlation in FINDINGS but flag uncertainty.
 
 #### P-29: Kubernetes Issue → Pipeline Config Check
@@ -274,7 +274,7 @@ The skills are designed as a layered architecture. Each layer handles a distinct
 - **▶ Trigger:** User investigates a Jenkinsfile bug or pipeline behavior
 - **📤 Data:** Jenkinsfile path
 - **Contract:** `devops-daily-protocol` in Investigation mode can invoke `jenkins-pipeline-architect`'s syntax validation as a read-only check (no modifications). Results go to worklog FINDINGS.
-- **⚠️ Edge Case — JDK Version Mismatch:** `syntax_check.groovy` requires JDK 17 (`JAVA_HOME=/opt/homebrew/opt/openjdk@17`). If JDK 17 is not installed, the check fails silently.
+- **⚠️ Edge Case — JDK Version Mismatch:** the syntax check requires JDK 17 or lower. Run it through `scripts/syntax_check.sh`, which resolves a suitable JDK automatically. If none is found it exits 1 naming the required version. Invoking `syntax_check.groovy` directly under a newer JDK fails with `Unsupported class file major version <N>`.
 
 ---
 
@@ -621,7 +621,7 @@ When a user prompt is received, evaluate in sequence:
 | Tempo API 429 Rate Limited | `devops-daily-protocol` | Wait 60 seconds, retry with exponential backoff (max 3 attempts). |
 | NR CLI returns no data | `devops-daily-protocol` | Log "No NR data available" in FINDINGS. Suggest manual NR UI check. |
 | `gh` CLI not authenticated | `jira-worklog-processor` | PR review workflow fails gracefully. Log error, suggest `gh auth login`. |
-| `syntax_check.groovy` JDK error | `jenkins-pipeline-architect` | `JAVA_HOME` override missing. Suggest: `JAVA_HOME=/opt/homebrew/opt/openjdk@17`. |
+| `syntax_check` JDK error | `jenkins-pipeline-architect` | JDK too new. Suggest running `scripts/syntax_check.sh`, or setting `JAVA_HOME` to a JDK 17 install. |
 | Artifactory Storage API timeout | `jenkins-pipeline-architect` | Active Choice parameter returns fallback: `["ERROR: timeout", "1.0.0"]`. |
 
 ### 5.4 Prompt.log Conflicts
@@ -684,12 +684,15 @@ CHECK 3: Is the worklog file path correct?
 ### Symptom: Jenkins Syntax Check Fails
 
 ```
-CHECK 1: Is JDK 17 installed?
-         └── Required: /opt/homebrew/opt/openjdk@17
-         └── Groovy 3.x ASM is incompatible with JDK 25
-         
-CHECK 2: Is syntax_check.groovy accessible?
-         └── Path: skills/jenkins-pipeline-architect/scripts/syntax_check.groovy
+CHECK 1: Is a JDK 17 (or lower) installed?
+         └── Groovy 3.x cannot read class files from newer JDKs
+         └── macOS: /usr/libexec/java_home -v 17
+         └── Linux: $JVM_SEARCH_PATH (default /usr/lib/jvm)
+         └── Any platform: export JAVA_HOME_17
+
+CHECK 2: Is the syntax check accessible?
+         └── Wrapper: skills/jenkins-pipeline-architect/scripts/syntax_check.sh
+         └── Script:  skills/jenkins-pipeline-architect/scripts/syntax_check.groovy
          
 CHECK 3: Is the Jenkinsfile a valid Groovy file?
          └── Check brace matching, string literals, closure syntax

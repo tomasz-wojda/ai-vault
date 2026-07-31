@@ -12,8 +12,8 @@ Contributions fall into one of four categories:
 |----------|----------|-------------------|
 | **Protocol Updates** | Adding a new workflow mode, refining SKILL.md structure | `devops-daily-protocol`, `jira-worklog-processor` |
 | **Content Patterns** | New FINDINGS patterns, solution option formats, PR review templates | `jira-worklog-processor` |
-| **CI/CD & Tooling** | Jenkins pipeline syntax checks, MCP daemon enhancements, Java/Groovy tooling | `jenkins-pipeline-architect`, core tools |
-| **Documentation** | README updates, examples walkthroughs, cross-skill integration guide | All skills + `CROSS_SKILL_INTEGRATION.md` |
+| **CI/CD & Tooling** | Jenkins pipeline syntax checks, repo validation scripts, Groovy tooling | `jenkins-pipeline-architect`, core tools |
+| **Documentation** | README updates, examples walkthroughs, cross-skill integration guide | All skills + `skills/CROSS_SKILL_INTEGRATION.md` |
 
 ---
 
@@ -45,7 +45,8 @@ Before submitting any contribution:
 
 ### CI/CD & Tooling (`jenkins-pipeline-architect/`)
 
-- [ ] Run `skills/jenkins-pipeline-architect/scripts/syntax_check.groovy` before committing
+- [ ] Run `skills/jenkins-pipeline-architect/scripts/syntax_check.sh` before committing
+- [ ] Run `scripts/validate-skills.sh` before committing any skill or rule change
 - [ ] Ensure pipeline syntax is valid and tested
 - [ ] Add JIRA notification comments via `postJiraComment` if applicable
 - [ ] Document any new pipeline stages or gates
@@ -107,25 +108,25 @@ Before submitting any contribution:
 
 ### Java/Groovy Files
 
-1. Use `gitAdd . && gitCommit -m "message"` for staging and committing
-2. Follow the Write Gate Protocol for any file creation/editing:
+1. Follow the Write Gate Protocol for any file creation/editing:
    - ANNOUNCE the operation type
    - PREVIEW full content (file content, API payload, git command)
    - WAIT — "Proceed? (yes/no)"
    - EXECUTE only after user confirms
    - VERIFY success (re-read file, re-run verify)
+2. The agent never commits or pushes. It proposes a semantic commit title and description; the contributor runs the git commands.
 
 ### Jenkins Pipelines
 
-1. Run `skills/jenkins-pipeline-architect/scripts/syntax_check.groovy` before committing
+1. Run `skills/jenkins-pipeline-architect/scripts/syntax_check.sh` before committing
 2. Ensure pipeline syntax is valid and tested
 3. Add JIRA notification comments via `postJiraComment` if applicable
 
-### MCP Daemon
+### Skills and Rules
 
-1. Use the provided Docker Compose setup for local testing
-2. Ensure Unix socket activation at `/tmp/groovy-agent.sock` works correctly
-3. Test both stdio and HTTP/SSE transport modes
+1. Run `scripts/validate-skills.sh`; it must exit 0
+2. Keep each `SKILL.md` under 500 lines — move detail into a sibling `references/` file
+3. Bump the `version:` field in the skill's frontmatter per `VERSIONING.md`
 
 ---
 
@@ -134,17 +135,14 @@ Before submitting any contribution:
 ### Local Testing
 
 ```bash
-# Run syntax check on Jenkins pipelines
-./skills/jenkins-pipeline-architect/scripts/syntax_check.groovy
+./scripts/validate-skills.sh
 
-# Test JIRA CLI
-./worklog/interface/jira/jira-ticket-info.sh summary KD-1234
+./skills/jenkins-pipeline-architect/scripts/syntax_check.sh
 
-# Test NR CLI
+./worklog/interface/jira/jira-ticket-info.sh summary
+./worklog/interface/jira/jira-ticket-info.sh KD-1234
+
 ./worklog/interface/newrelic/newrelic-info.sh apps
-
-# Test kubectl diagnostics
-cat zzzrecycle/monitor_commands.txt
 ```
 
 ### PR Review Testing
@@ -241,9 +239,9 @@ Related ticket: KD-1234
 Read these files in order:
 
 1. `README.md` — Project overview and structure
-2. `CROSS_SKILL_INTEGRATION.md` — How skills interact
-3. `VERSIONING.md` — Versioning policy
-4. `plan.md` — Current project plan
+2. `ONBOARDING.md` — Setup, workspace layout, safety rules
+3. `skills/CROSS_SKILL_INTEGRATION.md` — How skills interact
+4. `VERSIONING.md` — Versioning policy
 
 ### Step 2: Pick a Contribution
 
@@ -303,5 +301,3 @@ Choose one of these starting points:
 Thank you for contributing to AI Vault. Your contributions help make this platform more robust, useful, and accessible to everyone.
 
 For questions or feedback, please open an issue in the repository.
-
-Happy coding! 🚀

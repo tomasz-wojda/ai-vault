@@ -2,16 +2,18 @@
 
 ```
 ai-vault/
-├── .agent/skills                 <- Create symlink to skills/        (AntiGravity)
-├── .cursor/skills                <- Create symlink to skills/        (Cursor)
 ├── skills/                       <- Single truth for SKILLS
+│   ├── CROSS_SKILL_INTEGRATION.md <- Handoff contracts between skills
 │   ├── developer-protocol/
 │   │   └── SKILL.md
 │   ├── devops-daily-protocol/
 │   │   └── SKILL.md
 │   ├── jenkins-pipeline-architect/
 │   │   ├── SKILL.md
+│   │   ├── references/
+│   │   │   └── pipeline-patterns.md
 │   │   └── scripts/
+│   │       ├── syntax_check.sh       <- macOS/Linux entry point, resolves JDK 17
 │   │       └── syntax_check.groovy
 │   └── jira-worklog-processor/
 │       ├── SKILL.md
@@ -19,9 +21,18 @@ ai-vault/
 │       ├── worklog.template
 │       ├── worklog-reference.md
 │       └── examples.md
+├── scripts/
+│   └── validate-skills.sh        <- Repo integrity checks; run before every commit
 ├── .rules                        <- Single truth for Rules           (AntiGravity, Cursor)
-└── README.md                     <- This file
+├── .gitignore
+├── README.md                     <- This file
+├── ONBOARDING.md                 <- Setup and workspace layout
+├── CONTRIBUTING.md               <- Contribution guide
+└── VERSIONING.md                 <- Versioning policy
 ```
+
+Agent hosts read the skills through symlinks created outside this repository
+(`~/.cursor/skills`, `~/.agent/skills`). See § Symlink Setup.
 
 ## Skill Layering & Integration
 
@@ -43,10 +54,14 @@ ai-vault/
 └─────────────────────────────────────────────────┘
 ```
 
-For full details on handoff protocols, artifact ownership, and data flows between skills, see the master [Cross-Skill Integration Guide](file:///Users/gmb/workspace/ai-vault/skills/CROSS_SKILL_INTEGRATION.md).
+For full details on handoff protocols, artifact ownership, and data flows between skills, see the master [Cross-Skill Integration Guide](skills/CROSS_SKILL_INTEGRATION.md).
 
 
 ## Symlink Setup
+
+On macOS and Linux the symlink target must be an **absolute** path. A relative target
+(`ln -s ./skills ...`) is resolved against the link's own directory and produces a
+dangling link. Verify with `readlink -f ~/.cursor/skills`.
 
 ### Skills
 
@@ -57,8 +72,9 @@ mklink /J C:\Users\YOUR_PROFILE\.gemini\.agent\skills X:\repositories\ai-vault\s
 
 macOS/Linux:
 ```
-ln -s /path/to/ai-vault/skills ~/.cursor/skills
-ln -s /path/to/ai-vault/skills ~/.agent/skills
+VAULT=/absolute/path/to/ai-vault
+ln -s "$VAULT/skills" ~/.cursor/skills
+ln -s "$VAULT/skills" ~/.agent/skills
 ```
 
 ### Rules
@@ -70,6 +86,14 @@ mklink C:\Users\YOUR_PROFILE\.gemini\.agent\.rules X:\repositories\ai-vault\.rul
 
 macOS/Linux:
 ```
-ln -s /path/to/ai-vault/.rules ~/YOUR_WORKSPACE/.rules
-ln -s /path/to/ai-vault/.rules ~/.agent/.rules
+VAULT=/absolute/path/to/ai-vault
+ln -s "$VAULT/.rules" ~/YOUR_WORKSPACE/.rules
+ln -s "$VAULT/.rules" ~/.agent/.rules
+```
+
+## Validation
+
+Run before every commit that touches `skills/` or `.rules`:
+```
+./scripts/validate-skills.sh
 ```

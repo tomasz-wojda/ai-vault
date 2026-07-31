@@ -1,5 +1,6 @@
 ---
-name: developer-mode-protocol
+name: developer-protocol
+version: "1.0.0"
 description: Enforces a strict multi-mode workflow (RESEARCH, INNOVATE, PLAN, EXECUTE) to ensure codebase integrity and prevent unauthorized modifications.
 ---
 
