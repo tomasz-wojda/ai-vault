@@ -79,11 +79,22 @@ This skill serves as the **operational lifecycle shell (Layer 2)** and orchestra
 
 For the full interaction matrix, see [CROSS_SKILL_INTEGRATION.md](../CROSS_SKILL_INTEGRATION.md).
 
-## Workflow Modes
+## Workflow Routines
 
-Five modes triggered by user intent. Detect the appropriate mode from context.
+Nine routines triggered by user intent. Detect the appropriate routine from context.
+Governance modes (RESEARCH, INNOVATE, PLAN, EXECUTE) are orthogonal and controlled
+by the developer-protocol skill. These routines define WHEN operational activities
+happen; governance modes define WHAT actions are permitted.
 
-### MODE: Day Start
+### ROUTINE: Preflight
+Trigger: start of session, or user requests environment check.
+Steps:
+1. Run `ai-worklog preflight` (from ai-worklog-framework) to validate workspace,
+   binaries, authentication, and connectivity
+2. Report any BLOCKED or DEGRADED services
+3. If ticket-scoped: check required repositories and interfaces for that ticket
+
+### ROUTINE: Day Start
 Trigger: user starts work, asks "what should I work on", or requests ticket overview.
 Steps:
 1. Run `worklog/interface/jira/jira-ticket-info.sh summary` to pull current board state
@@ -95,7 +106,7 @@ Steps:
    - Blocked tickets (flag but skip for pickup)
 5. If there are open NR violations, mention them: run `worklog/interface/newrelic/newrelic-info.sh violations`
 
-### MODE: Ticket Pickup
+### ROUTINE: Ticket Pickup
 Trigger: user selects a ticket to work on, or says "pick up TICKET-KEY".
 Steps:
 1. Run `worklog/interface/jira/jira-ticket-info.sh <TICKET-KEY>` to fetch full ticket detail
@@ -144,7 +155,7 @@ Steps:
 5. After approval, create the file
 6. If ticket involves monitoring, alerting, or infrastructure, suggest relevant NR commands
 
-### MODE: Investigation
+### ROUTINE: Investigation
 Trigger: user is actively working on a ticket — researching, querying, analyzing.
 This mode supports the user during active investigation. Use tools as needed:
 
@@ -168,7 +179,33 @@ This mode supports the user during active investigation. Use tools as needed:
   `worklog/YYYY-MM-DD_TICKET-KEY_suffix_raw.log`
 - Suffixes describe the sub-investigation (e.g., `_oomkilled`, `_zoltan-alerts`, `_solr-logs`)
 
-### MODE: Ticket Done
+### ROUTINE: Delivery
+Trigger: implementation is complete; user is ready to commit, open PRs, build, deploy, or verify.
+This routine tracks the progression from local implementation to live-verified deployment.
+
+**Delivery lifecycle states** (tracked per-ticket):
+- `implemented_locally` — code written but not committed
+- `committed` — changes committed to a branch
+- `pr_open` — pull request created
+- `pr_merged` — pull request merged to target branch
+- `built` — CI build succeeded, artifact produced
+- `configured` — GitOps manifests updated (image tag, config)
+- `synchronized` — ArgoCD or deploy system applied the change
+- `verified_live` — live environment confirmed working
+
+**Key activities:**
+- Track multi-repository PR dependencies and merge order
+- Record build numbers, image tags, and chart versions
+- Detect ArgoCD sync state (including false-positive Synced without live update)
+- Document manual operations not captured in PRs (forced syncs, seed runs)
+- Run verification commands from the service catalog
+- Update structured ticket state via `ai-worklog delivery status`
+
+**Updating worklog DELIVERY STATE section:**
+- Each delivery lifecycle change is a **WRITE GATE** — show proposed update before applying
+- Record the complete state including all repositories and environments
+
+### ROUTINE: Ticket Done
 Trigger: user says ticket is done, finished, complete, or asks to log time.
 Steps:
 1. Read the worklog file (`worklog/YYYY-MM-DD_TICKET-KEY*.log`) to summarize accomplishments
@@ -200,7 +237,7 @@ Steps:
    - After approval: create `worklog/done/` if it doesn't exist, move all matching files
    - Confirm move by listing the moved files in `worklog/done/`
 
-### MODE: Day End
+### ROUTINE: Day End
 Trigger: user ends their day, asks for daily summary, or wants to verify logged hours.
 Steps:
 1. Run `worklog/interface/jira/jira-ticket-info.sh verify` to compare worklog files vs Tempo for today
@@ -269,10 +306,18 @@ All worklog files follow the `skills/jira-worklog-processor/worklog.template` st
 | Section | Content |
 |---------|---------|
 | Header | Ticket metadata from JIRA (key, summary, status, type, priority, project, assignee, reporter, components, created, updated, description) |
+| REFERENCED REPOSITORIES | Repos involved, local clone status, default branches |
 | FINDINGS | Numbered findings with sub-sections using dotted separators |
 | PROPOSED SOLUTIONS | Options with labels (e.g., SOLUTION A, SOLUTION B) including pros/cons |
-| PROPOSED ACTIONS | Numbered action items, grouped by priority (IMMEDIATE, NEXT) |
+| RISK CONSIDERATIONS | Identified risks and mitigations |
+| PROPOSED ACTIONS | Numbered action items, grouped by priority (IMMEDIATE, NEXT) or gates (G0-G4) |
+| OPEN DECISIONS | Tracked decisions with status (open/resolved/superseded) |
+| BLOCKERS | Active and resolved blockers with owners |
 | ACTION LOG | Chronological record of actions taken during the session |
+| DELIVERY STATE | Multi-dimensional lifecycle: implementation, committed, PR, built, GitOps, synced, verified |
+| STATUS | Current ticket status summary |
+| TIME LOGGED | Tempo entries and session durations |
+| NEXT ACTION | Explicit continuation point for next session |
 
 ### tickets.log
 The file `worklog/tickets.log` stores the latest output from `worklog/interface/jira/jira-ticket-info.sh summary`. Overwrite it each time summary is run at day start.
