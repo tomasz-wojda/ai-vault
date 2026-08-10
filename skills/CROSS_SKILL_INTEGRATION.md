@@ -47,7 +47,7 @@ The skills are designed as a layered architecture. Each layer handles a distinct
 
 ---
 
-## 2. Complete Interaction Matrix (45 Patterns)
+## 2. Complete Interaction Matrix (53 Patterns)
 
 ### Legend
 
@@ -491,6 +491,40 @@ The skills are designed as a layered architecture. Each layer handles a distinct
   └─────────────────────────────────────────────────────────────┘
   ```
 
+### 2.10 ai-worklog-framework Integration (8 patterns)
+
+#### P-46: Session Preflight
+- **Trigger:** Session start
+- **Contract:** Run `ai-worklog preflight`; BLOCKED stops dependent operations, DEGRADED is reported.
+
+#### P-47: Ticket-Scoped Preflight
+- **Trigger:** Ticket Pickup
+- **Contract:** `ai-worklog preflight --ticket <KEY>` resolves catalog services, repositories, and prerequisites.
+
+#### P-48: Ticket Preparation Handoff
+- **Trigger:** Ticket key selected
+- **Contract:** `ticket prepare` supplies worklog history, repositories, delivery paths, and preparation gaps to L3.
+
+#### P-49: Structured State Mutation
+- **Trigger:** Lifecycle state changes
+- **Contract:** PLAN previews the state delta; EXECUTE applies `ai-worklog state ... --apply`; `delivery status` verifies read-only.
+
+#### P-50: Diagnostic Evidence
+- **Trigger:** A catalog diagnostic pack matches the investigation
+- **Contract:** `diag run` creates redacted evidence; L3 references the bundle from FINDINGS or ACTION LOG.
+
+#### P-51: Dual Delivery Representation
+- **Trigger:** Structured or human delivery state changes
+- **Contract:** JSON leads automation, worklog leads narrative, and contradictions must be surfaced rather than silently overwritten.
+
+#### P-52: Daily Continuation
+- **Trigger:** Day Start or Day End
+- **Contract:** Framework reports consume `next_action`, blockers, and uncommitted state while JIRA remains board authority.
+
+#### P-53: Closeout Handoff
+- **Trigger:** Ticket Done
+- **Contract:** `closeout report` precedes Tempo and archival Write Gates.
+
 ---
 
 ## 3. Data Flow & Workspace Artifact Ownership
@@ -531,6 +565,9 @@ The skills are designed as a layered architecture. Each layer handles a distinct
 | `PR.log` | `jira-worklog-processor` | `jira-worklog-processor` | All skills |
 | `worklog.template` | `jira-worklog-processor` | User-maintained | `jira-worklog-processor` |
 | `ticket-pickup.prompt` | `jira-worklog-processor` | User-maintained | `jira-worklog-processor` |
+| `.ai-worklog/state/<KEY>.json` | `ai-worklog-framework` schema | `devops-daily-protocol` through Write Gates | Daily, delivery, and closeout reports |
+| `.ai-worklog/evidence/*` | `ai-worklog-framework` | Runtime workspace | Investigation and delivery routines |
+| `.ai-worklog/config.json` | User/workspace | `ai-worklog workspace init` | Framework commands |
 | `syntax_check.groovy` | `jenkins-pipeline-architect` | `jenkins-pipeline-architect` | `jenkins-pipeline-architect` |
 | `tmp/<KEY>/` | `jira-worklog-processor` | `jira-worklog-processor` | All skills |
 | Jenkinsfiles | `jenkins-pipeline-architect` | Workspace/SCM | `jenkins-pipeline-architect` |
@@ -707,3 +744,4 @@ CHECK 3: Is the Jenkinsfile a valid Groovy file?
 |---------|------|--------|
 | 1.0 | Initial | Basic interaction matrix, data flow, decision tree |
 | 2.0 | IMP-03.1 | Full 45-pattern handoff contracts, edge cases, troubleshooting, composite workflows |
+| 2.1 | 2026-08-10 | Added ai-worklog preflight, state, diagnostics, daily, and closeout contracts |

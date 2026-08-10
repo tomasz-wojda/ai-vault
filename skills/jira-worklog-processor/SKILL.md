@@ -1,6 +1,6 @@
 ---
 name: jira-worklog-processor
-version: "1.0.0"
+version: "1.1.0"
 description: >-
   Process JIRA tickets into structured worklog files following a multi-phase
   research-first workflow. Extends devops-daily-protocol with content generation
@@ -21,7 +21,7 @@ phased action plans, and manage cross-ticket investigations.
 
 | Skill | Source | What it covers |
 |-------|--------|----------------|
-| `devops-daily-protocol` | `skills/devops-daily-protocol/` | Lifecycle shell: Day Start → Pickup → Investigation → Done → Day End. Tool contracts (JIRA CLI, NR CLI). Write Gate Protocol. Tempo API. prompt.log. |
+| `devops-daily-protocol` | `skills/devops-daily-protocol/` | Lifecycle shell: Preflight → Day Start → Pickup → Investigation → Delivery → Done → Day End. Tool contracts and Write Gates. |
 | `developer-protocol` | `skills/developer-protocol/` | Mode discipline: RESEARCH → INNOVATE → PLAN → EXECUTE. Transition rules. Regression testing. |
 | `jenkins-pipeline-architect` | `skills/jenkins-pipeline-architect/` | Jenkins scripted pipelines. JIRA notification from CI/CD (`postJiraComment`). Syntax validation. |
 | **this skill** | `skills/jira-worklog-processor/` | **Content generation**: how to write each worklog section. FINDINGS patterns (architecture, audit, gap, inventory). Solution option format. Gate-based action plans. Cross-ticket references. Worklog template (`worklog.template`). |
@@ -52,6 +52,9 @@ worklog/interface/artifactory/          #   Artifactory credentials
 worklog/interface/ssh/                  #   SSH configs / jump hosts
 worklog/interface/snow/                 #   ServiceNow session cookie
 worklog/interface/datadog/              #   Datadog API keys
+.ai-worklog/config.json                 # Framework workspace configuration
+.ai-worklog/state/<TICKET-KEY>.json     # Machine-readable ticket lifecycle
+.ai-worklog/evidence/                   # Redacted diagnostic evidence
 zzzrecycle/monitor_commands.txt         # kubectl diagnostic patterns
 tmp/                                    # Per-ticket scratch artifacts
 prompt.log                              # Session audit trail (append-only)
@@ -59,7 +62,7 @@ prompt.log                              # Session audit trail (append-only)
 
 Credential files are never committed and never read for their values. If
 `worklog/interface/` is absent, the workspace predates this layout — run
-`ai-vault/scripts/setup-workspace-interface.sh <workspace> --dry-run` first.
+`ai-worklog workspace init <workspace>` first, then apply it through a Write Gate.
 See [worklog-reference.md](worklog-reference.md) § "Interface Directory".
 
 The `ticket-pickup.prompt` template ships with this skill at [ticket-pickup.prompt](ticket-pickup.prompt).
@@ -129,6 +132,7 @@ Read operations (always allowed): JIRA CLI, NR CLI, file reads, kubectl read-onl
 |------|------|-------------|
 | JIRA CLI | `worklog/interface/jira/jira-ticket-info.sh` | `summary`, `<KEY>`, `rejected`, `tempo [DATE]`, `verify [DATE]` |
 | New Relic CLI | `worklog/interface/newrelic/newrelic-info.sh` | `apps`, `app <ID>`, `hosts <ID>`, `deployments <ID>`, `alerts <ID>`, `violations` |
+| AI Worklog | `ai-worklog` on PATH | `preflight`, `ticket prepare`, `state`, `diag`, `delivery`, `closeout` |
 | Worklog template | [worklog.template](worklog.template) | Section scaffold (ships with this skill) |
 | kubectl patterns | `zzzrecycle/monitor_commands.txt` | Cluster diagnostics |
 
@@ -136,18 +140,19 @@ Read operations (always allowed): JIRA CLI, NR CLI, file reads, kubectl read-onl
 
 0. Read [ticket-pickup.prompt](ticket-pickup.prompt) template. Extract `TICKET-KEY` from user input.
    Substitute `{TICKET_KEY}` in the template. Follow all steps described in the template.
-1. Run `worklog/interface/jira/jira-ticket-info.sh <TICKET-KEY>` to fetch full ticket detail
-2. Parse output: key, summary, status, type, priority, project, assignee, reporter,
+1. Run `ai-worklog preflight --ticket <TICKET-KEY>` and `ai-worklog ticket prepare <TICKET-KEY>`
+2. Run `worklog/interface/jira/jira-ticket-info.sh <TICKET-KEY>` to fetch full ticket detail
+3. Parse output: key, summary, status, type, priority, project, assignee, reporter,
    components, labels, epic, created, updated, description, comments, linked issues, time spent
-3. **Reopened ticket check**: look for `worklog/done/*_<TICKET-KEY>*.log`
+4. **Reopened ticket check**: look for `worklog/done/*_<TICKET-KEY>*.log`
    - If found: "Previous worklog found in `done/`: [list]. Copy back to `worklog/`?"
    - On approval: copy back, skip fresh creation
-4. **WRITE GATE**: Create `worklog/YYYY-MM-DD_<TICKET-KEY>.log`
+5. **WRITE GATE**: Create the worklog and initialize structured ticket state
    - Read [worklog.template](worklog.template) for structure
    - Pre-populate TICKET header from JIRA fields
    - Include Comments and Linked Issues if present
    - Include Time Spent from Tempo data
-5. If ticket has related tickets, add a RELATED TICKET section after the header
+6. If ticket has related tickets, add a RELATED TICKET section after the header
 
 ## Phase 2: Research (FINDINGS)
 
@@ -162,6 +167,7 @@ Systematically investigate the ticket scope. This phase is **read-only**.
 - [ ] For infrastructure tickets: SSH manifests, AWS console, kubectl, NR queries
 - [ ] For CI/CD tickets: Jenkins configs, GHA workflows, Helm values
 - [ ] For monitoring tickets: NRQL queries, NR app/host/alert data
+- [ ] Run catalog-matched `ai-worklog diag` packs and reference evidence in FINDINGS
 
 ### Findings Format
 
@@ -260,6 +266,12 @@ CURRENT: <phase description>
 
 Valid status labels: RESEARCH, INNOVATE, PLAN, EXECUTE, BLOCKED, PARKED, DONE
 
+### Structured State
+
+Preview every `ai-worklog state` mutation, apply it only after a Write Gate, then
+run `ai-worklog delivery status <TICKET-KEY>`. Mirror material lifecycle changes
+into DELIVERY STATE and ACTION LOG. Never hand-edit `.ai-worklog/state/*.json`.
+
 ### Scratch Artifacts in tmp/
 
 For scripts, SSH outputs, plans, data files:
@@ -357,13 +369,14 @@ If no worklog is found for the ticket key (or no ticket key in the PR):
 
 ## Phase 6: Completion
 
-1. Update STATUS to DONE
-2. Ask user for time estimate (or propose based on session complexity)
-3. Run `worklog/interface/jira/jira-ticket-info.sh tempo` to check today's hours
-4. **WRITE GATE**: Log time via Tempo API
-5. Run `worklog/interface/jira/jira-ticket-info.sh verify` to confirm
-6. Update TIME LOGGED section in worklog
-7. **WRITE GATE**: Move worklog files to `worklog/done/`
+1. Run `ai-worklog closeout report <TICKET-KEY>`
+2. Update STATUS to DONE
+3. Ask user for time estimate (or propose based on session complexity)
+4. Run `worklog/interface/jira/jira-ticket-info.sh tempo` to check today's hours
+5. **WRITE GATE**: Log time via Tempo API
+6. Run `worklog/interface/jira/jira-ticket-info.sh verify` to confirm
+7. Update TIME LOGGED section in worklog
+8. **WRITE GATE**: Move worklog files to `worklog/done/` and update closeout state
 
 ## File Naming Conventions
 

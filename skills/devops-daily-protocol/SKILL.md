@@ -1,10 +1,10 @@
 ---
 name: devops-daily-protocol
-version: "1.0.0"
+version: "1.1.0"
 description: >-
   Orchestrates daily DevOps operations: pulling JIRA tickets, selecting work items,
-  creating structured worklog files, integrating New Relic monitoring, and managing
-  Tempo time logging. Use when starting a work day, picking up a ticket,
+  creating structured worklog files, integrating ai-worklog and New Relic monitoring,
+  and managing Tempo time logging. Use when starting a work day, picking up a ticket,
   investigating issues, finishing ticket work, or logging time.
 ---
 
@@ -15,6 +15,7 @@ All operations are **read-only by default**. Any write operation requires the Wr
 
 Write operations include:
 - Creating or editing files (worklog files, raw logs)
+- Applying `ai-worklog workspace` or `ai-worklog state` changes
 - HTTP POST/PUT/DELETE to JIRA, Tempo, or any external API
 - Git commits, pushes, or any repository modifications
 
@@ -23,6 +24,7 @@ Read operations (always allowed without approval):
 - Running New Relic CLI in any mode (apps, app, hosts, deployments, alerts, violations)
 - Reading any workspace file
 - Running kubectl read-only commands (get, describe, top, logs)
+- Running `ai-worklog` preflight, prepare, report, catalog, diagnostic, and toolchain reads
 
 After every interaction, append a summary to `prompt.log` (see Prompt Logging section).
 
@@ -61,6 +63,15 @@ for the full service inventory.
 - **NR host audit**: `zzzrecycle/nr-audit.sh` — remote audit of New Relic config on docker hosts
 - **Worklog template**: `skills/jira-worklog-processor/worklog.template` — structure for worklog files (managed by sibling skill `jira-worklog-processor`)
 
+### AI Worklog CLI
+- `ai-worklog workspace init <path>` — preview workspace initialization; add `--apply` only after a Write Gate
+- `ai-worklog preflight [--ticket <KEY>] [--service <SERVICE>...]` — environment readiness
+- `ai-worklog ticket prepare <KEY>` — worklogs, catalog, repositories, PRs, and delivery path
+- `ai-worklog state ...` — validated local structured state; mutations require dry-run preview and Write Gate
+- `ai-worklog delivery status <KEY>` and `closeout report <KEY>` — read-only reconciliation reports
+- `ai-worklog diag list|run` — registered read-only diagnostics and redacted evidence
+- `ai-worklog day start|end` and `toolchain check|list|env` — daily and runtime reports
+
 ## Cross-Skill Handoffs
 
 This skill serves as the **operational lifecycle shell (Layer 2)** and orchestrates handoffs to sibling skills:
@@ -92,31 +103,34 @@ Steps:
 1. Run `ai-worklog preflight` (from ai-worklog-framework) to validate workspace,
    binaries, authentication, and connectivity
 2. Report any BLOCKED or DEGRADED services
-3. If ticket-scoped: check required repositories and interfaces for that ticket
+3. If ticket-scoped, run `ai-worklog preflight --ticket <TICKET-KEY>`
+4. For a new workspace, preview `ai-worklog workspace init <path>` and use a Write Gate before `--apply`
 
 ### ROUTINE: Day Start
 Trigger: user starts work, asks "what should I work on", or requests ticket overview.
 Steps:
-1. Run `worklog/interface/jira/jira-ticket-info.sh summary` to pull current board state
-2. Run `worklog/interface/jira/jira-ticket-info.sh tempo` to check hours already logged today
-3. Present ticket overview grouped by board column
-4. Suggest which ticket to pick up next, prioritizing by:
+1. Run `ai-worklog day start` to reconcile structured state and active worklogs
+2. Run `worklog/interface/jira/jira-ticket-info.sh summary` to pull current board state
+3. Run `worklog/interface/jira/jira-ticket-info.sh tempo` to check hours already logged today
+4. Present ticket overview grouped by board column
+5. Suggest which ticket to pick up next, prioritizing by:
    - Priority field (Wysoki > Sredni > Niski)
    - Ticket age (older unresolved tickets first)
    - Blocked tickets (flag but skip for pickup)
-5. If there are open NR violations, mention them: run `worklog/interface/newrelic/newrelic-info.sh violations`
+6. If there are open NR violations, mention them: run `worklog/interface/newrelic/newrelic-info.sh violations`
 
 ### ROUTINE: Ticket Pickup
 Trigger: user selects a ticket to work on, or says "pick up TICKET-KEY".
 Steps:
-1. Run `worklog/interface/jira/jira-ticket-info.sh <TICKET-KEY>` to fetch full ticket detail
-2. Parse the output to extract: key, summary, status, type, priority, project, assignee, reporter, components, created, updated, description
-3. Check if `worklog/done/*_TICKET-KEY*.log` exists (reopened ticket detection)
+1. Run `ai-worklog ticket prepare <TICKET-KEY>` and ticket-scoped preflight
+2. Run `worklog/interface/jira/jira-ticket-info.sh <TICKET-KEY>` to fetch full ticket detail
+3. Parse the output to extract: key, summary, status, type, priority, project, assignee, reporter, components, created, updated, description
+4. Check if `worklog/done/*_TICKET-KEY*.log` exists (reopened ticket detection)
    - If found: inform user "Previous worklog found in `done/` for this ticket: [list files]. Copy back to `worklog/`?"
    - **WRITE GATE**: show files and proposed copy action
    - If user approves: copy files back to `worklog/`, skip creating new worklog from template
    - If user declines: proceed with creating fresh worklog from template as normal
-4. **WRITE GATE**: Propose creating worklog file at `worklog/YYYY-MM-DD_TICKET-KEY.log`
+5. **WRITE GATE**: Propose creating worklog file and initializing `ai-worklog state`
    - Pre-populate ticket header from JIRA response using template structure:
      ```
      ================================================================================
@@ -152,8 +166,8 @@ Steps:
      ================================================================================
      ```
    - Show the full proposed file content and path before creating
-5. After approval, create the file
-6. If ticket involves monitoring, alerting, or infrastructure, suggest relevant NR commands
+6. After approval, create the file and run `ai-worklog state init <TICKET-KEY> --apply`
+7. If ticket involves monitoring, alerting, or infrastructure, suggest relevant diagnostic or NR commands
 
 ### ROUTINE: Investigation
 Trigger: user is actively working on a ticket — researching, querying, analyzing.
@@ -167,6 +181,7 @@ This mode supports the user during active investigation. Use tools as needed:
 - Recent deployments: `worklog/interface/newrelic/newrelic-info.sh deployments <APP_ID>`
 
 **Kubernetes diagnostics** (read `zzzrecycle/monitor_commands.txt` for full list):
+- Prefer a matching read-only pack from `ai-worklog diag list`; run it with `ai-worklog diag run` and reference its evidence bundle in FINDINGS
 - Unhealthy pods: `kubectl get pods --all-namespaces | awk '$4 != "Running" && $4 != "Completed" && NR > 1'`
 - Pod resource usage: `kubectl top pods -n <NAMESPACE> --sort-by=memory`
 - Recent failure events: `kubectl get events --all-namespaces --sort-by='.lastTimestamp' | grep -iE "not ready|unhealthy|back-off|failed" | tail -20`
@@ -199,16 +214,18 @@ This routine tracks the progression from local implementation to live-verified d
 - Detect ArgoCD sync state (including false-positive Synced without live update)
 - Document manual operations not captured in PRs (forced syncs, seed runs)
 - Run verification commands from the service catalog
-- Update structured ticket state via `ai-worklog delivery status`
+- Preview structured changes with `ai-worklog state ...`; after Write Gate approval, apply them with `--apply`
+- Run `ai-worklog delivery status <TICKET-KEY>` after mutations to reconcile lifecycle gaps
 
 **Updating worklog DELIVERY STATE section:**
 - Each delivery lifecycle change is a **WRITE GATE** — show proposed update before applying
 - Record the complete state including all repositories and environments
+- Structured JSON leads automation; mirror material state into the human worklog in a separate Write Gate
 
 ### ROUTINE: Ticket Done
 Trigger: user says ticket is done, finished, complete, or asks to log time.
 Steps:
-1. Read the worklog file (`worklog/YYYY-MM-DD_TICKET-KEY*.log`) to summarize accomplishments
+1. Run `ai-worklog closeout report <TICKET-KEY>`, then read matching worklogs
 2. Determine time spent:
    - Ask the user for their estimate, OR
    - Propose an estimate based on worklog complexity and session context
@@ -240,13 +257,14 @@ Steps:
 ### ROUTINE: Day End
 Trigger: user ends their day, asks for daily summary, or wants to verify logged hours.
 Steps:
-1. Run `worklog/interface/jira/jira-ticket-info.sh verify` to compare worklog files vs Tempo for today
-2. Run `worklog/interface/jira/jira-ticket-info.sh tempo` to show total hours logged today
-3. Analyze the output:
+1. Run `ai-worklog day end` for the structured continuation capsule
+2. Run `worklog/interface/jira/jira-ticket-info.sh verify` to compare worklog files vs Tempo for today
+3. Run `worklog/interface/jira/jira-ticket-info.sh tempo` to show total hours logged today
+4. Analyze the output:
    - **MATCHED**: worklog file exists AND Tempo entry exists — no action needed
    - **MISSING FROM TEMPO**: worklog file exists but no hours logged — flag for action, offer to log via Ticket Done mode
    - **MISSING FROM WORKLOG**: Tempo entry but no local file — informational only
-4. Present daily summary: tickets worked on, total hours, any gaps
+5. Present daily summary: tickets worked on, total hours, any gaps
 
 ## Write Gate Protocol
 Every non-read operation MUST follow this protocol:

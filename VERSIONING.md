@@ -76,8 +76,8 @@ a skill's version must state the bump in its commit description, using the seman
 | Skill | Version | Last Updated | Notes |
 |-------|---------|--------------|-------|
 | developer-protocol | 1.0.0 | 2026-07-31 | Canonical mode protocol; `.rules` § 3 delegates here |
-| devops-daily-protocol | 1.0.0 | 2026-07-31 | Lifecycle shell, Write Gate, tool contracts |
-| jira-worklog-processor | 1.0.0 | 2026-07-31 | Worklog content patterns, PR review workflow |
+| devops-daily-protocol | 1.1.0 | 2026-08-10 | ai-worklog preflight, state, diagnostics, and delivery integration |
+| jira-worklog-processor | 1.1.0 | 2026-08-10 | Structured-state and diagnostic evidence integration |
 | jenkins-pipeline-architect | 1.0.0 | 2026-07-31 | Core rules in SKILL.md, detail in `references/` |
 
 Update this table in the same change that bumps a skill's frontmatter version.

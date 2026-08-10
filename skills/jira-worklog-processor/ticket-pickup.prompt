@@ -1,3 +1,4 @@
+run ai-worklog preflight and ticket prepare for {TICKET_KEY},
 pull up {TICKET_KEY}, create worklog with all the comments, findings,
 proposed actions and a plan with solutions and options,
 innovate on finding a solution, parse for referenced repositories

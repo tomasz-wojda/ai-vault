@@ -100,12 +100,24 @@ A workspace may predate this layout, with service folders sitting directly at th
 workspace root (`jira/`, `newrelic/`, …). Migrate with:
 
 ```
-ai-vault/scripts/setup-workspace-interface.sh <workspace> --dry-run
-ai-vault/scripts/setup-workspace-interface.sh <workspace> --link
+ai-worklog workspace init <workspace>
+ai-worklog workspace init <workspace> --apply
 ```
 
-`--link` places symlinks under `worklog/interface/` pointing at the existing folders, so
-the target paths resolve without moving any data. `--move` performs the final relocation.
+Initialization creates runtime directories and places symlinks under
+`worklog/interface/` without moving service data or overwriting existing targets.
+
+### Structured Ticket State
+
+Machine-readable lifecycle state is stored at
+`.ai-worklog/state/<TICKET-KEY>.json`. Use `ai-worklog state` commands for
+validated updates; do not edit these files directly. `delivery status` and
+`closeout report` reconcile this state with delivery expectations. Human-readable
+DELIVERY STATE, BLOCKERS, OPEN DECISIONS, and NEXT ACTION sections remain in the
+worklog and must be synchronized through Write Gates.
+
+Diagnostic evidence is written under `.ai-worklog/evidence/`. Reference relevant
+bundle paths from FINDINGS or ACTION LOG rather than copying large output blocks.
 
 ### Credential File Format
 

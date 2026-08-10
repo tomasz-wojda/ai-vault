@@ -58,6 +58,8 @@
 ================================================================================
   DELIVERY STATE
 ================================================================================
+  Structured state: .ai-worklog/state/<TICKET-KEY>.json
+  Keep this human summary synchronized through explicit Write Gates.
   Implementation: not_started | in_progress | complete
   Committed:      no | yes (branch: )
   PR:             none | open | merged

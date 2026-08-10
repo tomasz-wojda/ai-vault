@@ -12,6 +12,7 @@ Welcome to **AI Vault**, the single-repo platform for multi-agent workflow autom
 - **JDK 17** — required by the Jenkins syntax check. JDK 18 and newer break it: Groovy 3.x cannot read their class files.
 - **Groovy 3.x** — for `syntax_check.groovy`
 - **GitHub CLI (`gh`)** — for PR reviews and ticket workflows
+- **ai-worklog-framework 0.2.0+** — executable preflight, state, diagnostics, and reports
 
 ### First Steps
 
@@ -26,16 +27,20 @@ ln -s "$VAULT/skills" ~/.cursor/skills      # Cursor
 ln -s "$VAULT/skills" ~/.agent/skills       # AntiGravity
 ln -s "$VAULT/skills" ~/.claude/skills      # Claude Code
 ln -s "$VAULT/.rules" ~/.agent/.rules
+
+git clone https://github.com/tomasz-wojda/ai-worklog-framework.git ../ai-worklog-framework
+export PATH="$(cd ../ai-worklog-framework && pwd)/bin:$PATH"
 ```
 
 Claude Code reads the same `SKILL.md` frontmatter, so one symlink is all it needs.
 It does not read `.rules` — its equivalent is `CLAUDE.md`, which this repo does not
 ship; under Claude Code the mode protocol comes from the `developer-protocol` skill.
 
-If the workspace predates the `worklog/interface/` layout, run:
+Initialize or reconcile a workspace with:
 ```
-./scripts/setup-workspace-interface.sh /path/to/workspace --dry-run
-./scripts/setup-workspace-interface.sh /path/to/workspace --link
+ai-worklog workspace init /path/to/workspace
+ai-worklog workspace init /path/to/workspace --apply
+ai-worklog --workspace /path/to/workspace preflight
 ```
 
 ### Understanding the Structure
@@ -52,7 +57,7 @@ ai-vault/
 ├── skills/                       ← single truth for SKILLS
 │   ├── CROSS_SKILL_INTEGRATION.md ← handoff contracts between skills
 │   ├── developer-protocol/       ← RESEARCH→INNOVATE→PLAN→EXECUTE
-│   ├── devops-daily-protocol/    ← Day Start→Pickup→Investigation→Done→Day End
+│   ├── devops-daily-protocol/    ← Preflight→Pickup→Investigation→Delivery→Done
 │   │   └── SKILL.md              ← workflow + tool contracts
 │   ├── jenkins-pipeline-architect/ ← CI/CD pipelines, JIRA notifications
 │   │   ├── SKILL.md
@@ -142,6 +147,10 @@ ai-vault/
 ├── README.md                      ← project overview
 ├── CONTRIBUTING.md                ← contribution guide
 ├── VERSIONING.md                  ← versioning policy
+├── .ai-worklog/
+│   ├── config.json                ← framework configuration
+│   ├── state/                     ← structured ticket lifecycle
+│   └── evidence/                  ← redacted diagnostic bundles
 ├── worklog/
 │   ├── done/                       ← archive for completed tickets
 │   └── interface/                  ← service connectivity hub
@@ -272,8 +281,15 @@ Transition only on explicit `MODE: <name>` from user.
 ### Tool Paths Not Found
 
 Skills reference `worklog/interface/<service>/`. If the workspace still has service
-folders at its root, run `scripts/setup-workspace-interface.sh <workspace> --link`.
+folders at its root, preview and apply `ai-worklog workspace init <workspace>`.
 Verify with `ls -l <workspace>/worklog/interface/`.
+
+### AI Worklog Preflight Is Blocked
+
+Run `ai-worklog preflight` for all checks or add `--ticket <KEY>` for ticket scope.
+Resolve BLOCKED dependencies before dependent operations. DEGRADED checks may proceed
+only after they are reported. If structured and human delivery state differ, inspect
+`ai-worklog delivery status <KEY>` and reconcile through a Write Gate.
 
 ### Worklog Template Out of Sync with SKILL.md
 

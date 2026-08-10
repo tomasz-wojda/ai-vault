@@ -38,6 +38,8 @@ case "${MODE}" in
     *) echo "unknown mode: ${MODE}"; usage; exit 1 ;;
 esac
 
+echo "DEPRECATED: use 'ai-worklog workspace init ${WORKSPACE}' for new workspaces." >&2
+
 DRY=0
 [ "${MODE}" = "--dry-run" ] && DRY=1
 

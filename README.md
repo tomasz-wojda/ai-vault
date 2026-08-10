@@ -42,8 +42,8 @@ Agent hosts read the skills through symlinks created outside this repository
 │  Governance: RESEARCH → INNOVATE → PLAN → EXEC  │
 ├─────────────────────────────────────────────────┤
 │  devops-daily-protocol                          │
-│  Lifecycle: pickup, investigation, done, verify │
-│  Tools: JIRA CLI, NR CLI, Tempo API             │
+│  Lifecycle: preflight, pickup, delivery, done   │
+│  Tools: ai-worklog, JIRA/NR CLI, Tempo API      │
 ├─────────────────────────────────────────────────┤
 │  jira-worklog-processor                         │
 │  Content: FINDINGS patterns, solution options,  │
@@ -55,6 +55,9 @@ Agent hosts read the skills through symlinks created outside this repository
 ```
 
 For full details on handoff protocols, artifact ownership, and data flows between skills, see the master [Cross-Skill Integration Guide](skills/CROSS_SKILL_INTEGRATION.md).
+
+Executable workspace setup, preflight, structured state, diagnostics, and reports
+are provided by [ai-worklog-framework](https://github.com/tomasz-wojda/ai-worklog-framework).
 
 
 ## Symlink Setup
