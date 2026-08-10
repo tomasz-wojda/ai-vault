@@ -43,7 +43,7 @@ regression-testing obligations: `skills/developer-protocol/SKILL.md`.
 - A skill's frontmatter `name` must equal its directory name, or no host will
   resolve it. Bump `version` per `VERSIONING.md` when changing a skill.
 - Skill tool paths target `worklog/interface/<service>/`. If a workspace predates
-  that layout, run `scripts/setup-workspace-interface.sh <workspace> --dry-run`.
+  that layout, run `ai-worklog workspace init <workspace>`.
 
 ## Debugging
 
