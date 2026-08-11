@@ -8,16 +8,41 @@ MAX_DESCRIPTION=1024
 MAX_SKILL_LINES=500
 PATH_ALLOWLIST="skills/jenkins-pipeline-architect/scripts/syntax_check.sh"
 SELF_PATH="scripts/validate-skills.sh"
+LABEL_WIDTH=17
+CHECK_COUNT=7
 
 FAILURES=0
+USE_COLOR=0
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ] && [ "${TERM:-}" != "dumb" ]; then
+    USE_COLOR=1
+fi
 
-fail() {
-    printf '%s\n' "FAIL  $1"
+if [ "${USE_COLOR}" -eq 1 ]; then
+    C_GREEN=$'\033[32m'
+    C_RED=$'\033[31m'
+    C_DIM=$'\033[2m'
+    C_RESET=$'\033[0m'
+else
+    C_GREEN=''
+    C_RED=''
+    C_DIM=''
+    C_RESET=''
+fi
+
+REPORT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/validate-skills.XXXXXX")"
+trap 'rm -rf "${REPORT_DIR}"' EXIT
+
+for section in metadata links fences leakage paths sizes manifest; do
+    : > "${REPORT_DIR}/${section}"
+done
+
+add_finding() {
+    printf '%s\n' "$2" >> "${REPORT_DIR}/$1"
     FAILURES=$((FAILURES + 1))
 }
 
-pass() {
-    printf '%s\n' "ok    $1"
+section_count() {
+    wc -l < "${REPORT_DIR}/$1" | tr -d ' '
 }
 
 tracked_md() {
@@ -61,44 +86,43 @@ fm_value() {
         }'
 }
 
-echo "== 1-4: SKILL.md frontmatter =="
+SKILL_COUNT=0
 for skill in skills/*/SKILL.md; do
     [ -f "${skill}" ] || continue
+    SKILL_COUNT=$((SKILL_COUNT + 1))
+
     dir="$(basename "$(dirname "${skill}")")"
 
     if [ "$(head -1 "${skill}")" != "---" ] || ! frontmatter "${skill}" | grep -q .; then
-        fail "${skill}:1 missing YAML frontmatter"
+        add_finding metadata "${skill}:1 missing YAML frontmatter"
         continue
     fi
 
     yaml_err="$(yaml_valid "${skill}")"
     if [ -n "${yaml_err}" ]; then
-        fail "${skill}:1 frontmatter is not valid YAML: $(printf '%s' "${yaml_err}" | tr '\n' ' ' | cut -c1-140)"
+        add_finding metadata "${skill}:1 frontmatter is not valid YAML: $(printf '%s' "${yaml_err}" | tr '\n' ' ' | cut -c1-140)"
         continue
     fi
 
     name="$(fm_value "${skill}" name)"
     if [ "${name}" != "${dir}" ]; then
-        fail "${skill}:2 frontmatter name '${name}' does not match directory '${dir}'"
+        add_finding metadata "${skill}:2 frontmatter name '${name}' does not match directory '${dir}'"
     fi
 
     desc="$(frontmatter "${skill}" | awk '/^description:/{f=1} f && !/^(name|version):/{print}' | tr '\n' ' ')"
     desc_len=${#desc}
     if [ "${desc_len}" -eq 0 ]; then
-        fail "${skill}:2 frontmatter description missing"
+        add_finding metadata "${skill}:2 frontmatter description missing"
     elif [ "${desc_len}" -gt "${MAX_DESCRIPTION}" ]; then
-        fail "${skill}:2 description is ${desc_len} chars, limit ${MAX_DESCRIPTION}"
+        add_finding metadata "${skill}:2 description is ${desc_len} chars, limit ${MAX_DESCRIPTION}"
     fi
 
     version="$(fm_value "${skill}" version)"
     if ! printf '%s' "${version}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-        fail "${skill}:2 frontmatter version '${version}' is not MAJOR.MINOR.PATCH"
+        add_finding metadata "${skill}:2 frontmatter version '${version}' is not MAJOR.MINOR.PATCH"
     fi
 done
-[ "${FAILURES}" -eq 0 ] && pass "frontmatter"
 
-echo "== 5: relative link targets resolve =="
-LINK_FAILS=0
 while IFS= read -r file; do
     [ -f "${file}" ] || continue
     dir="$(dirname "${file}")"
@@ -110,69 +134,77 @@ while IFS= read -r file; do
             http*|mailto:*|'') continue ;;
         esac
         if [ ! -e "${dir}/${target}" ]; then
-            printf '%s\n' "FAIL  ${file}:${lno} broken link -> ${target}"
+            printf '%s\n' "${file}:${lno} broken link -> ${target}"
         fi
     done
-done < <(tracked_md) > /tmp/.vs_links.$$ 2>/dev/null
-if [ -s /tmp/.vs_links.$$ ]; then
-    cat /tmp/.vs_links.$$
-    LINK_FAILS="$(wc -l < /tmp/.vs_links.$$ | tr -d ' ')"
+done < <(tracked_md) > "${REPORT_DIR}/links.tmp" 2>/dev/null
+if [ -s "${REPORT_DIR}/links.tmp" ]; then
+    cat "${REPORT_DIR}/links.tmp" >> "${REPORT_DIR}/links"
+    LINK_FAILS="$(wc -l < "${REPORT_DIR}/links.tmp" | tr -d ' ')"
     FAILURES=$((FAILURES + LINK_FAILS))
-else
-    pass "links"
 fi
-rm -f /tmp/.vs_links.$$
+rm -f "${REPORT_DIR}/links.tmp"
 
-echo "== 6: code fence balance =="
-FENCE_OK=1
 while IFS= read -r file; do
     [ -f "${file}" ] || continue
     count="$(grep -c '^```' "${file}")"
     if [ $((count % 2)) -ne 0 ]; then
-        fail "${file} has ${count} code fences (odd; a block is unterminated)"
-        FENCE_OK=0
+        add_finding fences "${file} has ${count} code fences (odd; a block is unterminated)"
     fi
 done < <(tracked_md)
-[ "${FENCE_OK}" -eq 1 ] && pass "fences"
 
-echo "== 7: no leaked tool-call syntax =="
 LEAK_HITS="$(repo_grep '<tool_call>|<function=|<parameter=' | grep -v "^${SELF_PATH}:" || true)"
 if [ -n "${LEAK_HITS}" ]; then
-    printf '%s\n' "${LEAK_HITS}" | while IFS= read -r hit; do printf '%s\n' "FAIL  ${hit}"; done
+    printf '%s\n' "${LEAK_HITS}" >> "${REPORT_DIR}/leakage"
     FAILURES=$((FAILURES + $(printf '%s\n' "${LEAK_HITS}" | wc -l | tr -d ' ')))
-else
-    pass "no tool-call leakage"
 fi
 
-echo "== 8: no machine-specific paths =="
 PATH_HITS="$(repo_grep '/Users/|file:///|~/\.(cursor|agent)/skills/.|/opt/homebrew/' | grep -v -e "^${PATH_ALLOWLIST}:" -e "^${SELF_PATH}:" || true)"
 if [ -n "${PATH_HITS}" ]; then
-    printf '%s\n' "${PATH_HITS}" | while IFS= read -r hit; do printf '%s\n' "FAIL  ${hit}"; done
+    printf '%s\n' "${PATH_HITS}" >> "${REPORT_DIR}/paths"
     FAILURES=$((FAILURES + $(printf '%s\n' "${PATH_HITS}" | wc -l | tr -d ' ')))
-else
-    pass "no machine-specific paths"
 fi
 
-echo "== 9: SKILL.md size =="
-SIZE_OK=1
 for skill in skills/*/SKILL.md; do
     [ -f "${skill}" ] || continue
     n="$(wc -l < "${skill}" | tr -d ' ')"
     if [ "${n}" -gt "${MAX_SKILL_LINES}" ]; then
-        fail "${skill} is ${n} lines, limit ${MAX_SKILL_LINES}"
-        SIZE_OK=0
+        add_finding sizes "${skill} is ${n} lines, limit ${MAX_SKILL_LINES}"
     fi
 done
-[ "${SIZE_OK}" -eq 1 ] && pass "skill size"
 
-echo "== 10: skills manifest =="
 MANIFEST="skills/manifest.json"
-MANIFEST_OK=1
+MANIFEST_SKILL_COUNT=0
+MANIFEST_IDE_COUNT=0
 
 if [ ! -f "${MANIFEST}" ]; then
-    fail "${MANIFEST} missing"
-    MANIFEST_OK=0
+    add_finding manifest "${MANIFEST} missing"
 else
+    manifest_counts="$(python3 <<'PY' 2>/dev/null
+import json
+
+try:
+    with open("skills/manifest.json", encoding="utf-8") as handle:
+        data = json.load(handle)
+except Exception:
+    print("0 0")
+    raise SystemExit
+
+skills = data.get("skills")
+if not isinstance(skills, list):
+    print("0 0")
+else:
+    ides = set()
+    for skill in skills:
+        if isinstance(skill, dict):
+            for ide in skill.get("ides") or []:
+                if isinstance(ide, str):
+                    ides.add(ide)
+    print(f"{len(skills)} {len(ides)}")
+PY
+)"
+    read -r MANIFEST_SKILL_COUNT MANIFEST_IDE_COUNT <<< "${manifest_counts}"
+
     manifest_err="$(python3 <<'PY' 2>&1
 import glob
 import json
@@ -279,19 +311,69 @@ PY
 )"
     if [ -n "${manifest_err}" ]; then
         while IFS= read -r line; do
-            [ -n "${line}" ] && fail "${line}"
+            [ -n "${line}" ] && add_finding manifest "${line}"
         done <<EOF
 ${manifest_err}
 EOF
-        MANIFEST_OK=0
     fi
 fi
-[ "${MANIFEST_OK}" -eq 1 ] && pass "manifest"
 
-echo
+print_row() {
+    local label="$1"
+    local section="$2"
+    local ok_detail="$3"
+    local count
+    count="$(section_count "${section}")"
+
+    if [ "${count}" -eq 0 ]; then
+        if [ -n "${ok_detail}" ]; then
+            printf '  %s✓%s %-*s %s%s%s\n' \
+                "${C_GREEN}" "${C_RESET}" "${LABEL_WIDTH}" "${label}" \
+                "${C_DIM}" "${ok_detail}" "${C_RESET}"
+        else
+            printf '  %s✓%s %s\n' "${C_GREEN}" "${C_RESET}" "${label}"
+        fi
+        return
+    fi
+
+    if [ "${count}" -eq 1 ]; then
+        ok_detail="${count} finding"
+    else
+        ok_detail="${count} findings"
+    fi
+    printf '  %s✗%s %-*s %s%s%s\n' \
+        "${C_RED}" "${C_RESET}" "${LABEL_WIDTH}" "${label}" \
+        "${C_DIM}" "${ok_detail}" "${C_RESET}"
+    while IFS= read -r line; do
+        [ -n "${line}" ] && printf '      %s\n' "${line}"
+    done < "${REPORT_DIR}/${section}"
+}
+
+printf '%s\n\n' "AI Vault Validation"
+
+print_row "Skill metadata" metadata "${SKILL_COUNT} skill$([ "${SKILL_COUNT}" -eq 1 ] && echo '' || echo s)"
+print_row "Relative links" links ""
+print_row "Code fences" fences ""
+print_row "Tool-call leakage" leakage ""
+print_row "Machine paths" paths ""
+print_row "Skill sizes" sizes ""
+if [ "$(section_count manifest)" -eq 0 ]; then
+    manifest_detail="${MANIFEST_SKILL_COUNT} skill$([ "${MANIFEST_SKILL_COUNT}" -eq 1 ] && echo '' || echo s) · ${MANIFEST_IDE_COUNT} IDE$([ "${MANIFEST_IDE_COUNT}" -eq 1 ] && echo '' || echo s)"
+else
+    manifest_detail=""
+fi
+print_row "Skills manifest" manifest "${manifest_detail}"
+
+printf '\n'
 if [ "${FAILURES}" -eq 0 ]; then
-    echo "validate-skills: PASS"
+    printf '%sPASS%s  %d checks · %d skill%s\n' \
+        "${C_GREEN}" "${C_RESET}" "${CHECK_COUNT}" "${SKILL_COUNT}" \
+        "$([ "${SKILL_COUNT}" -eq 1 ] && echo '' || echo s)"
     exit 0
 fi
-echo "validate-skills: ${FAILURES} finding(s)"
+if [ "${FAILURES}" -eq 1 ]; then
+    printf '%sFAIL%s  1 finding\n' "${C_RED}" "${C_RESET}"
+else
+    printf '%sFAIL%s  %d findings\n' "${C_RED}" "${C_RESET}" "${FAILURES}"
+fi
 exit 1
