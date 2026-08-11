@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "skills": [
+    {
+      "name": "developer-protocol",
+      "dir": "developer-protocol",
+      "required": true,
+      "ides": ["antigravity", "claude", "cursor"]
+    },
+    {
+      "name": "devops-daily-protocol",
+      "dir": "devops-daily-protocol",
+      "required": true,
+      "ides": ["antigravity", "claude", "cursor"]
+    },
+    {
+      "name": "jenkins-pipeline-architect",
+      "dir": "jenkins-pipeline-architect",
+      "required": false,
+      "ides": ["antigravity", "claude", "cursor"]
+    },
+    {
+      "name": "jira-worklog-processor",
+      "dir": "jira-worklog-processor",
+      "required": false,
+      "ides": ["antigravity", "claude", "cursor"]
+    }
+  ]
+}

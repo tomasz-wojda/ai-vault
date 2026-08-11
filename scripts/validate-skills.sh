@@ -165,6 +165,129 @@ for skill in skills/*/SKILL.md; do
 done
 [ "${SIZE_OK}" -eq 1 ] && pass "skill size"
 
+echo "== 10: skills manifest =="
+MANIFEST="skills/manifest.json"
+MANIFEST_OK=1
+
+if [ ! -f "${MANIFEST}" ]; then
+    fail "${MANIFEST} missing"
+    MANIFEST_OK=0
+else
+    manifest_err="$(python3 <<'PY' 2>&1
+import glob
+import json
+import os
+import sys
+
+manifest_path = "skills/manifest.json"
+valid_ides = {"cursor", "claude", "antigravity"}
+errors = []
+
+try:
+    with open(manifest_path, encoding="utf-8") as handle:
+        data = json.load(handle)
+except json.JSONDecodeError as exc:
+    errors.append(f"{manifest_path}: invalid JSON: {exc}")
+    for err in errors:
+        print(err)
+    sys.exit(0)
+
+if data.get("version") != 1:
+    errors.append(
+        f"{manifest_path}: version must be 1, got {data.get('version')!r}"
+    )
+
+skills = data.get("skills")
+if not isinstance(skills, list):
+    errors.append(f"{manifest_path}: skills must be an array")
+    skills = []
+
+names = set()
+dirs = set()
+declared_dirs = set()
+
+for index, skill in enumerate(skills):
+    if not isinstance(skill, dict):
+        errors.append(f"{manifest_path}: skills[{index}] must be an object")
+        continue
+
+    name = skill.get("name")
+    dir_name = skill.get("dir")
+    required = skill.get("required")
+    ides = skill.get("ides")
+
+    if not isinstance(name, str) or not name:
+        errors.append(f"{manifest_path}: skills[{index}] missing or invalid name")
+        continue
+    if name in names:
+        errors.append(f"{manifest_path}: duplicate skill name '{name}'")
+    names.add(name)
+
+    if not isinstance(dir_name, str) or not dir_name:
+        errors.append(
+            f"{manifest_path}: skills[{index}] ({name}) missing or invalid dir"
+        )
+        continue
+    if dir_name in dirs:
+        errors.append(f"{manifest_path}: duplicate skill dir '{dir_name}'")
+    dirs.add(dir_name)
+    declared_dirs.add(dir_name)
+
+    if name != dir_name:
+        errors.append(
+            f"{manifest_path}: skills[{index}] name '{name}' does not match dir '{dir_name}'"
+        )
+
+    if not isinstance(required, bool):
+        errors.append(
+            f"{manifest_path}: skills[{index}] ({name}) required must be boolean"
+        )
+
+    if not isinstance(ides, list) or not ides:
+        errors.append(
+            f"{manifest_path}: skills[{index}] ({name}) ides must be a non-empty array"
+        )
+    else:
+        seen_ides = set()
+        for ide in ides:
+            if not isinstance(ide, str) or ide not in valid_ides:
+                errors.append(
+                    f"{manifest_path}: skills[{index}] ({name}) invalid ide '{ide}'"
+                )
+            elif ide in seen_ides:
+                errors.append(
+                    f"{manifest_path}: skills[{index}] ({name}) duplicate ide '{ide}'"
+                )
+            seen_ides.add(ide)
+
+    skill_md = os.path.join("skills", dir_name, "SKILL.md")
+    if not os.path.isfile(skill_md):
+        errors.append(
+            f"{manifest_path}: declared dir '{dir_name}' missing {skill_md}"
+        )
+
+for skill_md in sorted(glob.glob("skills/*/SKILL.md")):
+    dir_name = os.path.basename(os.path.dirname(skill_md))
+    if dir_name not in declared_dirs:
+        errors.append(
+            f"{manifest_path}: undeclared skill directory '{dir_name}' ({skill_md})"
+        )
+
+for err in errors:
+    print(err)
+PY
+)"
+    if [ -n "${manifest_err}" ]; then
+        while IFS= read -r line; do
+            [ -n "${line}" ] && fail "${line}"
+        done <<EOF
+${manifest_err}
+EOF
+        MANIFEST_OK=0
+    fi
+fi
+[ "${MANIFEST_OK}" -eq 1 ] && pass "manifest"
+
 echo
 if [ "${FAILURES}" -eq 0 ]; then
     echo "validate-skills: PASS"
