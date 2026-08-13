@@ -28,35 +28,35 @@ Read operations (always allowed without approval):
 
 After every interaction, append a summary to `prompt.log` (see Prompt Logging section).
 
-## Available Tools
-All paths are relative to the workspace root. `worklog/interface/` is the canonical
-service hub: every external service has one subfolder holding its `credentials` file
-and, where applicable, its CLI script. See
-[worklog-reference.md](../jira-worklog-processor/worklog-reference.md) § "Interface Directory"
-for the full service inventory.
-
-### JIRA CLI
-**Path**: `worklog/interface/jira/jira-ticket-info.sh`
-
-| Mode | Command | Purpose |
-|------|---------|---------|
-| summary | `worklog/interface/jira/jira-ticket-info.sh summary` | Board overview: in-progress, blocked, to-do, recently completed |
-| ticket | `worklog/interface/jira/jira-ticket-info.sh <KEY>` | Full ticket detail: fields, description, comments, worklogs, assignment |
-| rejected | `worklog/interface/jira/jira-ticket-info.sh rejected` | List rejected (Odrzucone) tickets |
-| tempo | `worklog/interface/jira/jira-ticket-info.sh tempo [YYYY-MM-DD]` | Daily Tempo timesheet entries (defaults to today) |
-| verify | `worklog/interface/jira/jira-ticket-info.sh verify [YYYY-MM-DD]` | Compare local worklog/ files against Tempo entries |
-
-### New Relic CLI
-**Path**: `worklog/interface/newrelic/newrelic-info.sh`
-
-| Mode | Command | Purpose |
-|------|---------|---------|
-| apps | `worklog/interface/newrelic/newrelic-info.sh apps` | All applications with health status and metrics |
-| app | `worklog/interface/newrelic/newrelic-info.sh app <ID>` | Single application detail |
-| hosts | `worklog/interface/newrelic/newrelic-info.sh hosts <ID>` | Hosts for an application |
-| deployments | `worklog/interface/newrelic/newrelic-info.sh deployments <ID>` | Deployment history for an application |
-| alerts | `worklog/interface/newrelic/newrelic-info.sh alerts <ID>` | Alert conditions targeting an application |
-| violations | `worklog/interface/newrelic/newrelic-info.sh violations` | All open alert violations |
+31: ## Available Tools
+32: All paths are relative to the workspace root. `integrations/` is the canonical
+33: service hub: every external service has one subfolder holding its `credentials` file
+34: and, where applicable, its CLI script. See
+35: [worklog-reference.md](../jira-worklog-processor/worklog-reference.md) § "Interface Directory"
+36: for the full service inventory.
+37: 
+38: ### JIRA CLI
+39: **Path**: `integrations/jira/jira-ticket-info.sh`
+40: 
+41: | Mode | Command | Purpose |
+42: |------|---------|---------|
+43: | summary | `integrations/jira/jira-ticket-info.sh summary` | Board overview: in-progress, blocked, to-do, recently completed |
+44: | ticket | `integrations/jira/jira-ticket-info.sh <KEY>` | Full ticket detail: fields, description, comments, worklogs, assignment |
+45: | rejected | `integrations/jira/jira-ticket-info.sh rejected` | List rejected (Odrzucone) tickets |
+46: | tempo | `integrations/jira/jira-ticket-info.sh tempo [YYYY-MM-DD]` | Daily Tempo timesheet entries (defaults to today) |
+47: | verify | `integrations/jira/jira-ticket-info.sh verify [YYYY-MM-DD]` | Compare local worklog/ files against Tempo entries |
+48: 
+49: ### New Relic CLI
+50: **Path**: `integrations/newrelic/newrelic-info.sh`
+51: 
+52: | Mode | Command | Purpose |
+53: |------|---------|---------|
+54: | apps | `integrations/newrelic/newrelic-info.sh apps` | All applications with health status and metrics |
+55: | app | `integrations/newrelic/newrelic-info.sh app <ID>` | Single application detail |
+56: | hosts | `integrations/newrelic/newrelic-info.sh hosts <ID>` | Hosts for an application |
+57: | deployments | `integrations/newrelic/newrelic-info.sh deployments <ID>` | Deployment history for an application |
+58: | alerts | `integrations/newrelic/newrelic-info.sh alerts <ID>` | Alert conditions targeting an application |
+59: | violations | `integrations/newrelic/newrelic-info.sh violations` | All open alert violations |
 
 ### Monitoring References
 - **kubectl patterns**: `zzzrecycle/monitor_commands.txt` — read this file for cluster diagnostic commands
@@ -110,20 +110,20 @@ Steps:
 Trigger: user starts work, asks "what should I work on", or requests ticket overview.
 Steps:
 1. Run `ai-worklog day start` to reconcile structured state and active worklogs
-2. Run `worklog/interface/jira/jira-ticket-info.sh summary` to pull current board state
-3. Run `worklog/interface/jira/jira-ticket-info.sh tempo` to check hours already logged today
+2. Run `integrations/jira/jira-ticket-info.sh summary` to pull current board state
+3. Run `integrations/jira/jira-ticket-info.sh tempo` to check hours already logged today
 4. Present ticket overview grouped by board column
 5. Suggest which ticket to pick up next, prioritizing by:
    - Priority field (Wysoki > Sredni > Niski)
    - Ticket age (older unresolved tickets first)
    - Blocked tickets (flag but skip for pickup)
-6. If there are open NR violations, mention them: run `worklog/interface/newrelic/newrelic-info.sh violations`
+6. If there are open NR violations, mention them: run `integrations/newrelic/newrelic-info.sh violations`
 
 ### ROUTINE: Ticket Pickup
 Trigger: user selects a ticket to work on, or says "pick up TICKET-KEY".
 Steps:
 1. Run `ai-worklog ticket prepare <TICKET-KEY>` and ticket-scoped preflight
-2. Run `worklog/interface/jira/jira-ticket-info.sh <TICKET-KEY>` to fetch full ticket detail
+2. Run `integrations/jira/jira-ticket-info.sh <TICKET-KEY>` to fetch full ticket detail
 3. Parse the output to extract: key, summary, status, type, priority, project, assignee, reporter, components, created, updated, description
 4. Check if `worklog/done/*_TICKET-KEY*.log` exists (reopened ticket detection)
    - If found: inform user "Previous worklog found in `done/` for this ticket: [list files]. Copy back to `worklog/`?"
@@ -174,11 +174,11 @@ Trigger: user is actively working on a ticket — researching, querying, analyzi
 This mode supports the user during active investigation. Use tools as needed:
 
 **New Relic investigation patterns**:
-- Open violations: `worklog/interface/newrelic/newrelic-info.sh violations`
-- App-specific alerts: `worklog/interface/newrelic/newrelic-info.sh alerts <APP_ID>`
-- App health overview: `worklog/interface/newrelic/newrelic-info.sh apps` then `app <ID>`
-- Host inspection: `worklog/interface/newrelic/newrelic-info.sh hosts <APP_ID>`
-- Recent deployments: `worklog/interface/newrelic/newrelic-info.sh deployments <APP_ID>`
+- Open violations: `integrations/newrelic/newrelic-info.sh violations`
+- App-specific alerts: `integrations/newrelic/newrelic-info.sh alerts <APP_ID>`
+- App health overview: `integrations/newrelic/newrelic-info.sh apps` then `app <ID>`
+- Host inspection: `integrations/newrelic/newrelic-info.sh hosts <APP_ID>`
+- Recent deployments: `integrations/newrelic/newrelic-info.sh deployments <APP_ID>`
 
 **Kubernetes diagnostics** (read `zzzrecycle/monitor_commands.txt` for full list):
 - Prefer a matching read-only pack from `ai-worklog diag list`; run it with `ai-worklog diag run` and reference its evidence bundle in FINDINGS
@@ -230,7 +230,7 @@ Steps:
    - Ask the user for their estimate, OR
    - Propose an estimate based on worklog complexity and session context
    - Time must be in seconds for the API (1h = 3600, 30m = 1800)
-3. Run `worklog/interface/jira/jira-ticket-info.sh tempo` to show current day's logged hours
+3. Run `integrations/jira/jira-ticket-info.sh tempo` to show current day's logged hours
 4. **WRITE GATE**: Propose Tempo time logging. Show the exact operation:
    - Method: POST
    - URL: `https://jira.pl.grupa.iti/rest/tempo-timesheets/3/worklogs`
@@ -246,7 +246,7 @@ Steps:
      ```
    - Present the payload with actual values filled in
 5. After approval, execute the POST request
-6. Run `worklog/interface/jira/jira-ticket-info.sh verify` to confirm the entry appears in Tempo
+6. Run `integrations/jira/jira-ticket-info.sh verify` to confirm the entry appears in Tempo
 7. Present verification result
 8. **WRITE GATE**: Propose moving worklog files to `done/` subfolder
    - Identify all files matching `worklog/*_TICKET-KEY*.log` (glob on ticket key)
@@ -258,8 +258,8 @@ Steps:
 Trigger: user ends their day, asks for daily summary, or wants to verify logged hours.
 Steps:
 1. Run `ai-worklog day end` for the structured continuation capsule
-2. Run `worklog/interface/jira/jira-ticket-info.sh verify` to compare worklog files vs Tempo for today
-3. Run `worklog/interface/jira/jira-ticket-info.sh tempo` to show total hours logged today
+2. Run `integrations/jira/jira-ticket-info.sh verify` to compare worklog files vs Tempo for today
+3. Run `integrations/jira/jira-ticket-info.sh tempo` to show total hours logged today
 4. Analyze the output:
    - **MATCHED**: worklog file exists AND Tempo entry exists — no action needed
    - **MISSING FROM TEMPO**: worklog file exists but no hours logged — flag for action, offer to log via Ticket Done mode
@@ -337,44 +337,44 @@ All worklog files follow the `skills/jira-worklog-processor/worklog.template` st
 | TIME LOGGED | Tempo entries and session durations |
 | NEXT ACTION | Explicit continuation point for next session |
 
-### tickets.log
-The file `worklog/tickets.log` stores the latest output from `worklog/interface/jira/jira-ticket-info.sh summary`. Overwrite it each time summary is run at day start.
-
-## Prompt Logging
-After every interaction, append to `prompt.log` at the workspace root:
-```
---- PROMPT LOG ENTRY ---
-TIMESTAMP: YYYY-MM-DD
-USER: <concise summary of what the user asked>
-ASSISTANT: <mode used> — <concise summary of actions taken and outcomes>
-  <key details: files created, commands run, time logged, etc.>
---- END PROMPT LOG ENTRY ---
-```
-
-For multi-tab sessions, use sub-sections:
-```
---- PROMPT LOG ENTRY ---
-TIMESTAMP: YYYY-MM-DD
-USER: Multiple topics in single session.
-
-TAB 1: <tab description>
-  <details>
-
-TAB 2: <tab description>
-  <details>
---- END PROMPT LOG ENTRY ---
-```
-
-## New Relic Integration
-### Investigation Decision Tree
-| Need | Command |
-|------|---------|
-| Check for active incidents | `worklog/interface/newrelic/newrelic-info.sh violations` |
-| Find alert conditions for an app | `worklog/interface/newrelic/newrelic-info.sh alerts <APP_ID>` |
-| Check app health and metrics | `worklog/interface/newrelic/newrelic-info.sh app <APP_ID>` |
-| List all apps to find an ID | `worklog/interface/newrelic/newrelic-info.sh apps` |
-| Check which hosts serve an app | `worklog/interface/newrelic/newrelic-info.sh hosts <APP_ID>` |
-| Check recent deployments | `worklog/interface/newrelic/newrelic-info.sh deployments <APP_ID>` |
+340: ### tickets.log
+341: The file `worklog/tickets.log` stores the latest output from `integrations/jira/jira-ticket-info.sh summary`. Overwrite it each time summary is run at day start.
+342: 
+343: ## Prompt Logging
+344: After every interaction, append to `prompt.log` at the workspace root:
+345: ```
+346: --- PROMPT LOG ENTRY ---
+347: TIMESTAMP: YYYY-MM-DD
+348: USER: <concise summary of what the user asked>
+349: ASSISTANT: <mode used> — <concise summary of actions taken and outcomes>
+350:   <key details: files created, commands run, time logged, etc.>
+351: --- END PROMPT LOG ENTRY ---
+352: ```
+353: 
+354: For multi-tab sessions, use sub-sections:
+355: ```
+356: --- PROMPT LOG ENTRY ---
+357: TIMESTAMP: YYYY-MM-DD
+358: USER: Multiple topics in single session.
+359: 
+360: TAB 1: <tab description>
+361:   <details>
+362: 
+363: TAB 2: <tab description>
+364:   <details>
+365: --- END PROMPT LOG ENTRY ---
+366: ```
+367: 
+368: ## New Relic Integration
+369: ### Investigation Decision Tree
+370: | Need | Command |
+371: |------|---------|
+372: | Check for active incidents | `integrations/newrelic/newrelic-info.sh violations` |
+373: | Find alert conditions for an app | `integrations/newrelic/newrelic-info.sh alerts <APP_ID>` |
+374: | Check app health and metrics | `integrations/newrelic/newrelic-info.sh app <APP_ID>` |
+375: | List all apps to find an ID | `integrations/newrelic/newrelic-info.sh apps` |
+376: | Check which hosts serve an app | `integrations/newrelic/newrelic-info.sh hosts <APP_ID>` |
+377: | Check recent deployments | `integrations/newrelic/newrelic-info.sh deployments <APP_ID>` |
 | Audit NR config on a remote host | Read `zzzrecycle/nr-audit.sh`, run on target host via SSH |
 
 ### Common NRQL Patterns

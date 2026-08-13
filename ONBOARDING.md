@@ -152,12 +152,12 @@ ai-vault/
 │   ├── state/                     ← structured ticket lifecycle
 │   └── evidence/                  ← redacted diagnostic bundles
 ├── worklog/
-│   ├── done/                       ← archive for completed tickets
-│   └── interface/                  ← service connectivity hub
-│       ├── jira/credentials        ← JIRA + Tempo tokens (NEVER commit)
-│       ├── newrelic/credentials    ← NR API keys (NEVER commit)
-│       ├── aws/                    ← AWS profile files per account
-│       └── eks/                    ← EKS context files per cluster
+│   └── done/                       ← archive for completed tickets
+├── integrations/                   ← service connectivity hub
+│   ├── jira/credentials            ← JIRA + Tempo tokens (NEVER commit)
+│   ├── newrelic/credentials        ← NR API keys (NEVER commit)
+│   ├── aws/                        ← AWS profile files per account
+│   └── eks/                        ← EKS context files per cluster
 ├── zzzrecycle/monitor_commands.txt ← kubectl diagnostic patterns
 ├── prompt.log                      ← session audit trail (append-only)
 └── tmp/                            ← scratch artifacts (per-ticket folders)
@@ -230,15 +230,15 @@ When a PR is merged:
 
 | Operation | Allowed | Notes |
 |-----------|---------|-------|
-| JIRA CLI (`worklog/interface/jira/jira-ticket-info.sh`) | Always | 5 modes: `summary`, `<KEY>`, `rejected`, `tempo [DATE]`, `verify [DATE]` |
-| NR CLI (`worklog/interface/newrelic/newrelic-info.sh`) | Always | 6 modes: `apps`, `app <ID>`, `hosts <ID>`, `deployments <ID>`, `alerts <ID>`, `violations` |
+| JIRA CLI (`integrations/jira/jira-ticket-info.sh`) | Always | 5 modes: `summary`, `<KEY>`, `rejected`, `tempo [DATE]`, `verify [DATE]` |
+| NR CLI (`integrations/newrelic/newrelic-info.sh`) | Always | 6 modes: `apps`, `app <ID>`, `hosts <ID>`, `deployments <ID>`, `alerts <ID>`, `violations` |
 | File reads | Always | No restrictions |
 | kubectl (read-only) | Always | Use patterns from `zzzrecycle/monitor_commands.txt` |
 
 ### Never Commit
 
-- `worklog/interface/jira/credentials` — JIRA + Tempo tokens
-- `worklog/interface/newrelic/credentials` — NR API keys
+- `integrations/jira/credentials` — JIRA + Tempo tokens
+- `integrations/newrelic/credentials` — NR API keys
 
 The repository `.gitignore` already excludes `**/credentials`, `**/*.properties`,
 `**/cookie`, `worklog/`, `tmp/`, `prompt.log`, and `PR.log`. Verify with
@@ -280,9 +280,9 @@ Transition only on explicit `MODE: <name>` from user.
 
 ### Tool Paths Not Found
 
-Skills reference `worklog/interface/<service>/`. If the workspace still has service
+Skills reference `integrations/<service>/`. If the workspace still has service
 folders at its root, preview and apply `ai-worklog workspace init <workspace>`.
-Verify with `ls -l <workspace>/worklog/interface/`.
+Verify with `ls -l <workspace>/integrations/`.
 
 ### AI Worklog Preflight Is Blocked
 
@@ -300,9 +300,9 @@ only after they are reported. If structured and human delivery state differ, ins
 ### JIRA CLI Not Found
 
 ```bash
-chmod +x worklog/interface/jira/jira-ticket-info.sh
-./worklog/interface/jira/jira-ticket-info.sh summary
-./worklog/interface/jira/jira-ticket-info.sh KD-1234
+chmod +x integrations/jira/jira-ticket-info.sh
+./integrations/jira/jira-ticket-info.sh summary
+./integrations/jira/jira-ticket-info.sh KD-1234
 ```
 
 ---

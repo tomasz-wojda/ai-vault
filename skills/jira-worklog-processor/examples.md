@@ -212,7 +212,7 @@ INPUT:  "pull up KD-6945, create worklog with all the comments, findings,
          and other actions, rename the session tab to just the ticket number"
 
 OUTPUT SEQUENCE:
-1. worklog/interface/jira/jira-ticket-info.sh KD-6945
+1. integrations/jira/jira-ticket-info.sh KD-6945
 2. Check worklog/done/*KD-6945* (reopened?)
 3. Read skill's worklog.template file
 4. WRITE GATE: Create worklog/YYYY-MM-DD_KD-6945.log

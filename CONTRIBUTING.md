@@ -139,10 +139,10 @@ Before submitting any contribution:
 
 ./skills/jenkins-pipeline-architect/scripts/syntax_check.sh
 
-./worklog/interface/jira/jira-ticket-info.sh summary
-./worklog/interface/jira/jira-ticket-info.sh KD-1234
+./integrations/jira/jira-ticket-info.sh summary
+./integrations/jira/jira-ticket-info.sh KD-1234
 
-./worklog/interface/newrelic/newrelic-info.sh apps
+./integrations/newrelic/newrelic-info.sh apps
 ```
 
 ### PR Review Testing

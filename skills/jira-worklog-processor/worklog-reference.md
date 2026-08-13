@@ -21,145 +21,145 @@ worklog/
 │   ├── YYYY-MM-DD_TICKET-KEY_jira.log
 │   ├── YYYY-MM-DD_TICKET-KEY_suffix.log  # Sub-investigations
 │   └── *.txt                             # Data snapshots (ec2 tags, tables)
-└── interface/                          # Service connectivity hub
-    ├── aws/                            #   AWS profiles (export AWS_PROFILE=...)
-    ├── eks/                            #   EKS contexts (export KUBECONFIG=...)
-    ├── jira/                           #   JIRA CLI + credentials
-    ├── newrelic/                       #   NR CLI + credentials
-    ├── jenkins/                        #   Jenkins credentials
-    ├── github/                         #   GitHub tokens
-    ├── argocd/                         #   Argo CD credentials
-    ├── artifactory/                    #   Artifactory credentials
-    ├── ssh/                            #   SSH configs / jump hosts
-    ├── snow/                           #   ServiceNow session
-    └── datadog/                        #   Datadog API keys
-```
-
-### repos/ (21 cloned repositories)
-
-```
-repos/
-├── ai-vault/                           # Agent skills + rules (this repo)
-├── TVN-eks_konto-eks_konto/            # EKS cluster config, kube-core, OTel, Traefik
-├── TVN-eks_konto-eks_deployments/      # Argo CD deployment overlays per env
-├── TVN-eks_konto-jenkins/              # Jenkins pipelines (build, deploy, test)
-├── TVN-gitadmins-helm_charts/          # Helm charts — konto_all_chart + values/
-├── TVN-gitadmins-sso_github_actions/   # GHA reusable workflows (run-ci.yml)
-├── TVN-gitadmins-jira_integration/     # JIRA integration scripts
-├── TVN-gitadmins-gha-runners/          # GHA runner infrastructure
-├── TVN-gitadmins-anonymization/        # DB anonymization pipelines
-├── TVN-gitadmins-SFBR_pipelines/       # SFBR Jenkins job definitions
-├── TVN-eks-commons/                    # Shared EKS scripts (dyff, bump, validate)
-├── TVN-cue-eks_cue/                    # CUE EKS cluster config
-├── TVN-cue-environments_configuration/ # CUE docker-compose / envfile configs
-├── TVN-sso-aaa_api/                    # aaa-api (Node.js backend)
-├── TVN-sso-oauth_api/                  # oauth-api
-├── TVN-sso-oauth_provider_api/         # oauth-provider-api
-├── TVN-sso-tvnaccount_demo_app/        # demo app
-├── TVN-account-test_e2e/               # E2E test suite
-├── TVN-account-ts_sdk/                 # TypeScript SDK
-├── TVN-brookselkad7-bng/               # BNG project (Windows/.NET)
-└── tvn-account-webcomponent/           # Web component library (TypeScript/Lit)
-```
-
-### tmp/ (ticket artifacts + scratch)
-
-```
-tmp/
-├── TICKET-KEY/                         # Per-ticket artifact folders
-│   ├── ssh/{role}/manifest.txt         #   SSH evidence snapshots
-│   ├── *.sh                            #   Install/verify/collect scripts
-│   ├── *.md                            #   Plans, diffs, prerequisites
-│   └── integrations.d/*.yml            #   Config files for deployment
-├── worklog_skill/                      # Worklog processor skill (source copy)
-├── geralt/                             # NR NRQL facet query results
-├── TVN-cue-*/                          # CUE repo clones (3)
-├── TVN-zoltan-*/                       # Zoltan repo clones (~20)
-├── TICKET-KEY_*.sh                     # Standalone ticket scripts
-├── TICKET-KEY_*.list                   # Data candidate lists
-├── devopsNNN-probe.yaml                # Probe pod manifests
-├── devopsNNN_cmds.txt                  # Session command logs
-├── *_config_crossref.md                # Jenkins config line mapping
-├── plan_*.md                           # Investigation plans
-├── kontoprod2-rightsize.py             # EKS CPU rightsizing report
-├── player-consumer-check.sh            # Resource sweep script
-├── list_tvn_zoltan_codeowners.py       # GitHub CODEOWNERS audit
-├── tickets.log                         # JIRA assigned-ticket snapshot
-├── lambdas.log                         # CWP-4430 lambda investigation
-├── *.csv                               # Data exports (emails, etc.)
-└── *.properties                        # ⚠ Credentials — never commit
-```
-
-## Interface Directory — Service Connectivity
-
-`worklog/interface/` is the **required target layout** for service credentials and CLI
-scripts. Each subfolder corresponds to one external service. All skill tool paths are
-written against it.
-
-A workspace may predate this layout, with service folders sitting directly at the
-workspace root (`jira/`, `newrelic/`, …). Migrate with:
-
-```
-ai-worklog workspace init <workspace>
-ai-worklog workspace init <workspace> --apply
-```
-
-Initialization creates runtime directories and places symlinks under
-`worklog/interface/` without moving service data or overwriting existing targets.
-
-### Structured Ticket State
-
-Machine-readable lifecycle state is stored at
-`.ai-worklog/state/<TICKET-KEY>.json`. Use `ai-worklog state` commands for
-validated updates; do not edit these files directly. `delivery status` and
-`closeout report` reconcile this state with delivery expectations. Human-readable
-DELIVERY STATE, BLOCKERS, OPEN DECISIONS, and NEXT ACTION sections remain in the
-worklog and must be synchronized through Write Gates.
-
-Diagnostic evidence is written under `.ai-worklog/evidence/`. Reference relevant
-bundle paths from FINDINGS or ACTION LOG rather than copying large output blocks.
-
-### Credential File Format
-
-Two naming conventions are in use. Both are accepted:
-
-| Name | Format | Example |
-|------|--------|---------|
-| `credentials` | shell exports, source-able | `export JIRA_TOKEN="Bearer ..."` |
-| `<service>.properties` | key=value | `jira.properties`, `newrelic.properties` |
-| `cookie` | raw session cookie | ServiceNow CHG API |
-
-Usage: `source worklog/interface/jira/credentials`, or read `jira.properties` per the
-consuming script's convention. Never print, echo, or paste the contents into a worklog.
-
-### Per-Service Structure
-
-```
-worklog/interface/<service>/
-├── credentials                 # or <service>.properties / cookie — never commit
-└── <service>-info.sh           # CLI script (optional, service-specific)
-```
-
-### Service Inventory
-
-| Service | Folder | Credentials | Script | Notes |
-|---------|--------|-------------|--------|-------|
-| JIRA + Tempo | `jira/` | `jira.properties` or `credentials` | `jira-ticket-info.sh` (5 modes: summary, ticket, rejected, tempo, verify) | Primary ticket interface |
-| New Relic | `newrelic/` | `newrelic.properties` or `credentials` | `newrelic-info.sh` (6 modes: apps, app, hosts, deployments, alerts, violations) | Monitoring investigations |
-| AWS | `aws/` | Profile files (export AWS_PROFILE=...) | — | One file per account/role (cue-stage, cue-prod, konto-prod) |
-| EKS | `eks/` | Context files (export KUBECONFIG=... or context name) | — | One file per cluster (konto, cue) |
-| Jenkins | `jenkins/` | `jenkins.properties` or `credentials` | — | Build triggers, job config |
-| GitHub | `github/` | `github.properties` or `credentials` (GH_TOKEN) | — | gh CLI, API calls |
-| Argo CD | `argocd/` | `credentials` (ARGOCD_SERVER, ARGOCD_AUTH_TOKEN) | — | GitOps sync status |
-| Artifactory | `artifactory/` | `credentials` (ARTIFACTORY_URL, ARTIFACTORY_TOKEN) | — | Artifact version queries |
-| SSH | `ssh/` | Config files per environment (cue-stage, cue-prod) | — | Jump host configs, ProxyJump |
-| ServiceNow | `snow/` | `cookie` (session cookie for CHG API) | — | Change management |
-| Datadog | `datadog/` | `credentials` (DD_API_KEY, DD_APP_KEY) | — | If Datadog adopted per KD-6945 |
-
-### Security
-
-- All credential files MUST be in `.gitignore` — never commit tokens.
-- Reference credentials in worklogs by path only: "source worklog/interface/jira/credentials"
+24: └── integrations/                       # Service connectivity hub
+25:     ├── aws/                            #   AWS profiles (export AWS_PROFILE=...)
+26:     ├── eks/                            #   EKS contexts (export KUBECONFIG=...)
+27:     ├── jira/                           #   JIRA CLI + credentials
+28:     ├── newrelic/                       #   NR CLI + credentials
+29:     ├── jenkins/                        #   Jenkins credentials
+30:     ├── github/                         #   GitHub tokens
+31:     ├── argocd/                         #   Argo CD credentials
+32:     ├── artifactory/                    #   Artifactory credentials
+33:     ├── ssh/                            #   SSH configs / jump hosts
+34:     ├── snow/                           #   ServiceNow session
+35:     └── datadog/                        #   Datadog API keys
+36: ```
+37: 
+38: ### repos/ (21 cloned repositories)
+39: 
+40: ```
+41: repos/
+42: ├── ai-vault/                           # Agent skills + rules (this repo)
+43: ├── TVN-eks_konto-eks_konto/            # EKS cluster config, kube-core, OTel, Traefik
+44: ├── TVN-eks_konto-eks_deployments/      # Argo CD deployment overlays per env
+45: ├── TVN-eks_konto-jenkins/              # Jenkins pipelines (build, deploy, test)
+46: ├── TVN-gitadmins-helm_charts/          # Helm charts — konto_all_chart + values/
+47: ├── TVN-gitadmins-sso_github_actions/   # GHA reusable workflows (run-ci.yml)
+48: ├── TVN-gitadmins-jira_integration/     # JIRA integration scripts
+49: ├── TVN-gitadmins-gha-runners/          # GHA runner infrastructure
+50: ├── TVN-gitadmins-anonymization/        # DB anonymization pipelines
+51: ├── TVN-gitadmins-SFBR_pipelines/       # SFBR Jenkins job definitions
+52: ├── TVN-eks-commons/                    # Shared EKS scripts (dyff, bump, validate)
+53: ├── TVN-cue-eks_cue/                    # CUE EKS cluster config
+54: ├── TVN-cue-environments_configuration/ # CUE docker-compose / envfile configs
+55: ├── TVN-sso-aaa_api/                    # aaa-api (Node.js backend)
+56: ├── TVN-sso-oauth_api/                  # oauth-api
+57: ├── TVN-sso-oauth_provider_api/         # oauth-provider-api
+58: ├── TVN-sso-tvnaccount_demo_app/        # demo app
+59: ├── TVN-account-test_e2e/               # E2E test suite
+60: ├── TVN-account-ts_sdk/                 # TypeScript SDK
+61: ├── TVN-brookselkad7-bng/               # BNG project (Windows/.NET)
+62: └── tvn-account-webcomponent/           # Web component library (TypeScript/Lit)
+63: ```
+64: 
+65: ### tmp/ (ticket artifacts + scratch)
+66: 
+67: ```
+68: tmp/
+69: ├── TICKET-KEY/                         # Per-ticket artifact folders
+70: │   ├── ssh/{role}/manifest.txt         #   SSH evidence snapshots
+71: │   ├── *.sh                            #   Install/verify/collect scripts
+72: │   ├── *.md                            #   Plans, diffs, prerequisites
+73: │   └── integrations.d/*.yml            #   Config files for deployment
+74: ├── worklog_skill/                      # Worklog processor skill (source copy)
+75: ├── geralt/                             # NR NRQL facet query results
+76: ├── TVN-cue-*/                          # CUE repo clones (3)
+77: ├── TVN-zoltan-*/                       # Zoltan repo clones (~20)
+78: ├── TICKET-KEY_*.sh                     # Standalone ticket scripts
+79: ├── TICKET-KEY_*.list                   # Data candidate lists
+80: ├── devopsNNN-probe.yaml                # Probe pod manifests
+81: ├── devopsNNN_cmds.txt                  # Session command logs
+82: ├── *_config_crossref.md                # Jenkins config line mapping
+83: ├── plan_*.md                           # Investigation plans
+84: ├── kontoprod2-rightsize.py             # EKS CPU rightsizing report
+85: ├── player-consumer-check.sh            # Resource sweep script
+86: ├── list_tvn_zoltan_codeowners.py       # GitHub CODEOWNERS audit
+87: ├── tickets.log                         # JIRA assigned-ticket snapshot
+88: ├── lambdas.log                         # CWP-4430 lambda investigation
+89: ├── *.csv                               # Data exports (emails, etc.)
+90: └── *.properties                        # ⚠ Credentials — never commit
+91: ```
+92: 
+93: ## Interface Directory — Service Connectivity
+94: 
+95: `integrations/` is the **required target layout** for service credentials and CLI
+96: scripts. Each subfolder corresponds to one external service. All skill tool paths are
+97: written against it.
+98: 
+99: A workspace may predate this layout, with service folders sitting directly at the
+100: workspace root (`jira/`, `newrelic/`, …). Migrate with:
+101: 
+102: ```
+103: ai-worklog workspace init <workspace>
+104: ai-worklog workspace init <workspace> --apply
+105: ```
+106: 
+107: Initialization creates runtime directories and places symlinks under
+108: `integrations/` without moving service data or overwriting existing targets.
+109: 
+110: ### Structured Ticket State
+111: 
+112: Machine-readable lifecycle state is stored at
+113: `.ai-worklog/state/<TICKET-KEY>.json`. Use `ai-worklog state` commands for
+114: validated updates; do not edit these files directly. `delivery status` and
+115: `closeout report` reconcile this state with delivery expectations. Human-readable
+116: DELIVERY STATE, BLOCKERS, OPEN DECISIONS, and NEXT ACTION sections remain in the
+117: worklog and must be synchronized through Write Gates.
+118: 
+119: Diagnostic evidence is written under `.ai-worklog/evidence/`. Reference relevant
+120: bundle paths from FINDINGS or ACTION LOG rather than copying large output blocks.
+121: 
+122: ### Credential File Format
+123: 
+124: Two naming conventions are in use. Both are accepted:
+125: 
+126: | Name | Format | Example |
+127: |------|--------|---------|
+128: | `credentials` | shell exports, source-able | `export JIRA_TOKEN="Bearer ..."` |
+129: | `<service>.properties` | key=value | `jira.properties`, `newrelic.properties` |
+130: | `cookie` | raw session cookie | ServiceNow CHG API |
+131: 
+132: Usage: `source integrations/jira/credentials`, or read `jira.properties` per the
+133: consuming script's convention. Never print, echo, or paste the contents into a worklog.
+134: 
+135: ### Per-Service Structure
+136: 
+137: ```
+138: integrations/<service>/
+139: ├── credentials                 # or <service>.properties / cookie — never commit
+140: └── <service>-info.sh           # CLI script (optional, service-specific)
+141: ```
+142: 
+143: ### Service Inventory
+144: 
+145: | Service | Folder | Credentials | Script | Notes |
+146: |---------|--------|-------------|--------|-------|
+147: | JIRA + Tempo | `jira/` | `jira.properties` or `credentials` | `jira-ticket-info.sh` (5 modes: summary, ticket, rejected, tempo, verify) | Primary ticket interface |
+148: | New Relic | `newrelic/` | `newrelic.properties` or `credentials` | `newrelic-info.sh` (6 modes: apps, app, hosts, deployments, alerts, violations) | Monitoring investigations |
+149: | AWS | `aws/` | Profile files (export AWS_PROFILE=...) | — | One file per account/role (cue-stage, cue-prod, konto-prod) |
+150: | EKS | `eks/` | Context files (export KUBECONFIG=... or context name) | — | One file per cluster (konto, cue) |
+151: | Jenkins | `jenkins/` | `jenkins.properties` or `credentials` | — | Build triggers, job config |
+152: | GitHub | `github/` | `github.properties` or `credentials` (GH_TOKEN) | — | gh CLI, API calls |
+153: | Argo CD | `argocd/` | `credentials` (ARGOCD_SERVER, ARGOCD_AUTH_TOKEN) | — | GitOps sync status |
+154: | Artifactory | `artifactory/` | `credentials` (ARTIFACTORY_URL, ARTIFACTORY_TOKEN) | — | Artifact version queries |
+155: | SSH | `ssh/` | Config files per environment (cue-stage, cue-prod) | — | Jump host configs, ProxyJump |
+156: | ServiceNow | `snow/` | `cookie` (session cookie for CHG API) | — | Change management |
+157: | Datadog | `datadog/` | `credentials` (DD_API_KEY, DD_APP_KEY) | — | If Datadog adopted per KD-6945 |
+158: 
+159: ### Security
+160: 
+161: - All credential files MUST be in `.gitignore` — never commit tokens.
+162: - Reference credentials in worklogs by path only: "source integrations/jira/credentials"
 - Never open, print, or echo a credential file to read its values. Pass the path to the
   consuming script.
 - Scripts may be committed; credentials never.
