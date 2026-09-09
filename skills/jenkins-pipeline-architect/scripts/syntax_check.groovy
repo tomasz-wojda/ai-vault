@@ -2,13 +2,13 @@ import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.Phases
 
-def MAX_SUPPORTED_JDK = 17
+def MAX_SUPPORTED_JDK = 26
 
 def jdkVersion = System.getProperty('java.specification.version')
 def jdkMajor = jdkVersion.contains('.') ? jdkVersion.split('\\.')[0].toInteger() : jdkVersion.toInteger()
 
 if (jdkMajor > MAX_SUPPORTED_JDK) {
-    println "UNSUPPORTED JDK: running on JDK ${jdkVersion}, requires JDK ${MAX_SUPPORTED_JDK} or lower (Groovy 3.x ASM cannot read newer class files). Set JAVA_HOME to a JDK ${MAX_SUPPORTED_JDK} installation and re-run."
+    println "UNSUPPORTED JDK: running on JDK ${jdkVersion}, requires JDK ${MAX_SUPPORTED_JDK} or lower. Set JAVA_HOME to a supported JDK installation and re-run."
     System.exit(1)
 }
 

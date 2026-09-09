@@ -90,7 +90,7 @@ The skills are designed as a layered architecture. Each layer handles a distinct
 #### P-05: Mode Enforcement on Ticket Done
 - **▶ Trigger:** User marks ticket done, requests Tempo logging
 - **📤 Data:** Mode must be `EXECUTE` for Tempo API POST
-- **Contract:** Reading worklog summary and proposing time = `PLAN` mode. Executing Tempo POST and moving files = `EXECUTE` mode.
+- **Contract:** Reading worklog summary and running `service jira log-time` without `--apply` = `PLAN` mode. Repeating it with `--apply` and moving files = `EXECUTE` mode.
 - **⚠️ Edge Case:** User says "log 2 hours" without switching to EXECUTE — agent proposes in `PLAN`, waits for `MODE: EXECUTE` before HTTP POST.
 
 #### P-06: Deviation Handling — Forced Revert to PLAN
@@ -177,7 +177,7 @@ The skills are designed as a layered architecture. Each layer handles a distinct
 
 ### 2.4 devops-daily-protocol → jira-worklog-processor (8 patterns)
 
-184:   1. `devops-daily-protocol` fetches ticket via `integrations/jira/jira-ticket-info.sh <KEY>`
+184:   1. `devops-daily-protocol` fetches ticket via `ai-worklog service jira ticket <KEY>`
 185:   2. Checks for reopened ticket in `worklog/done/`
 186:   3. Hands off to `jira-worklog-processor` to create `worklog/YYYY-MM-DD_<KEY>.log` using `worklog.template`
 187:   4. `jira-worklog-processor` pre-populates TICKET header from JIRA response
@@ -208,11 +208,11 @@ The skills are designed as a layered architecture. Each layer handles a distinct
 212: - **Contract:**
 213:   1. `devops-daily-protocol` reads worklog to summarize accomplishments
 214:   2. `jira-worklog-processor` formats the Tempo comment from worklog content
-215:   3. `devops-daily-protocol` proposes Tempo POST via Write Gate
-216:   4. After approval: `devops-daily-protocol` executes POST, runs verify
+215:   3. `devops-daily-protocol` runs `ai-worklog service jira log-time` without `--apply`
+216:   4. After approval: reruns with `--apply`, then runs `ai-worklog service jira verify`
 217:   5. `jira-worklog-processor` updates TIME LOGGED section and STATUS to DONE
 218:   6. `devops-daily-protocol` moves files to `worklog/done/`
-219: - **⚠️ Edge Case — Partial Day Work:** User worked on ticket across multiple sessions → time should aggregate. Check `integrations/jira/jira-ticket-info.sh tempo` for existing entries.
+219: - **⚠️ Edge Case — Partial Day Work:** User worked on ticket across multiple sessions → time should aggregate. Check `ai-worklog service jira tempo` for existing entries.
 220: 
 221: #### P-23: Day End Handoff — Verification
 222: - **▶ Trigger:** User ends day or requests daily summary
@@ -370,7 +370,7 @@ The skills are designed as a layered architecture. Each layer handles a distinct
   ┌─ L1: developer-protocol ──────────────────────────────────┐
   │  MODE: RESEARCH                                            │
   │  ┌─ L2: devops-daily-protocol ──────────────────────────┐  │
-  │  │  Ticket Pickup: jira-ticket-info.sh DEVOPS-456        │  │
+  │  │  Ticket Pickup: ai-worklog service jira ticket DEVOPS-456 │
   │  │  ┌─ L3: jira-worklog-processor ───────────────────┐   │  │
   │  │  │  Create worklog from template                   │   │  │
   │  │  │  Populate TICKET header                         │   │  │
@@ -534,7 +534,7 @@ The skills are designed as a layered architecture. Each layer handles a distinct
 └─────────────┬─────────────┘
               │
               ▼
-184:   1. `devops-daily-protocol` fetches ticket via `integrations/jira/jira-ticket-info.sh <KEY>`
+184:   1. `devops-daily-protocol` fetches ticket via `ai-worklog service jira ticket <KEY>`
 185:   2. Checks for reopened ticket in `worklog/done/`
 186:   3. Hands off to `jira-worklog-processor` to create `worklog/YYYY-MM-DD_<KEY>.log` using `worklog.template`
 187:   4. `jira-worklog-processor` pre-populates TICKET header from JIRA response
@@ -565,11 +565,11 @@ The skills are designed as a layered architecture. Each layer handles a distinct
 212: - **Contract:**
 213:   1. `devops-daily-protocol` reads worklog to summarize accomplishments
 214:   2. `jira-worklog-processor` formats the Tempo comment from worklog content
-215:   3. `devops-daily-protocol` proposes Tempo POST via Write Gate
-216:   4. After approval: `devops-daily-protocol` executes POST, runs verify
+215:   3. `devops-daily-protocol` runs `ai-worklog service jira log-time` without `--apply`
+216:   4. After approval: reruns with `--apply`, then runs `ai-worklog service jira verify`
 217:   5. `jira-worklog-processor` updates TIME LOGGED section and STATUS to DONE
 218:   6. `devops-daily-protocol` moves files to `worklog/done/`
-219: - **⚠️ Edge Case — Partial Day Work:** User worked on ticket across multiple sessions → time should aggregate. Check `integrations/jira/jira-ticket-info.sh tempo` for existing entries.
+219: - **⚠️ Edge Case — Partial Day Work:** User worked on ticket across multiple sessions → time should aggregate. Check `ai-worklog service jira tempo` for existing entries.
 220: 
 221: #### P-23: Day End Handoff — Verification
 222: - **▶ Trigger:** User ends day or requests daily summary
@@ -727,7 +727,7 @@ The skills are designed as a layered architecture. Each layer handles a distinct
 374:   ┌─ L1: developer-protocol ──────────────────────────────────┐
 375:   │  MODE: RESEARCH                                            │
 376:   │  ┌─ L2: devops-daily-protocol ──────────────────────────┐  │
-377:   │  │  Ticket Pickup: jira-ticket-info.sh DEVOPS-456        │  │
+377:   │  │  Ticket Pickup: ai-worklog service jira ticket DEVOPS-456 │
 378:   │  │  ┌─ L3: jira-worklog-processor ───────────────────┐   │  │
 379:   │  │  │  Create worklog from template                   │   │  │
 380:   │  │  │  Populate TICKET header                         │   │  │
@@ -1007,7 +1007,7 @@ The skills are designed as a layered architecture. Each layer handles a distinct
 654: | Failure | Skill | Recovery |
 655: |---------|-------|----------|
 656: | JIRA CLI returns empty/error | `devops-daily-protocol` | Retry once. If still failing, log error in worklog FINDINGS and continue with manual data. |
-657: | Tempo API 401 Unauthorized | `devops-daily-protocol` | Check `integrations/jira/credentials`. Surface to user. Do not retry with same token. |
+657: | Tempo API 401 Unauthorized | `devops-daily-protocol` | Check `integrations/jira/jira.properties`. Surface to user. Do not retry with same token. |
 658: | Tempo API 429 Rate Limited | `devops-daily-protocol` | Wait 60 seconds, retry with exponential backoff (max 3 attempts). |
 659: | NR CLI returns no data | `devops-daily-protocol` | Log "No NR data available" in FINDINGS. Suggest manual NR UI check. |
 660: | `gh` CLI not authenticated | `jira-worklog-processor` | PR review workflow fails gracefully. Log error, suggest `gh auth login`. |
@@ -1129,7 +1129,7 @@ When a user prompt is received, evaluate in sequence:
 | Failure | Skill | Recovery |
 |---------|-------|----------|
 | JIRA CLI returns empty/error | `devops-daily-protocol` | Retry once. If still failing, log error in worklog FINDINGS and continue with manual data. |
-| Tempo API 401 Unauthorized | `devops-daily-protocol` | Check `integrations/jira/credentials`. Surface to user. Do not retry with same token. |
+| Tempo API 401 Unauthorized | `devops-daily-protocol` | Check `integrations/jira/jira.properties`. Surface to user. Do not retry with same token. |
 | Tempo API 429 Rate Limited | `devops-daily-protocol` | Wait 60 seconds, retry with exponential backoff (max 3 attempts). |
 | NR CLI returns no data | `devops-daily-protocol` | Log "No NR data available" in FINDINGS. Suggest manual NR UI check. |
 | `gh` CLI not authenticated | `jira-worklog-processor` | PR review workflow fails gracefully. Log error, suggest `gh auth login`. |

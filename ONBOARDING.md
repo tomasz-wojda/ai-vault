@@ -230,14 +230,16 @@ When a PR is merged:
 
 | Operation | Allowed | Notes |
 |-----------|---------|-------|
-| JIRA CLI (`integrations/jira/jira-ticket-info.sh`) | Always | 5 modes: `summary`, `<KEY>`, `rejected`, `tempo [DATE]`, `verify [DATE]` |
+| JIRA reads (`ai-worklog service jira`) | Always | `summary`, `ticket`, `rejected`, `reporter`, `tempo`, `verify`, `whoami` |
+| Tempo log-time dry run | Always | Omit `--apply` |
+| Tempo log-time apply | Write Gate | Add `--apply` only after approval |
 | NR CLI (`integrations/newrelic/newrelic-info.sh`) | Always | 6 modes: `apps`, `app <ID>`, `hosts <ID>`, `deployments <ID>`, `alerts <ID>`, `violations` |
 | File reads | Always | No restrictions |
 | kubectl (read-only) | Always | Use patterns from `zzzrecycle/monitor_commands.txt` |
 
 ### Never Commit
 
-- `integrations/jira/credentials` — JIRA + Tempo tokens
+- `integrations/jira/jira.properties` — JIRA + Tempo token
 - `integrations/newrelic/credentials` — NR API keys
 
 The repository `.gitignore` already excludes `**/credentials`, `**/*.properties`,
@@ -297,12 +299,12 @@ only after they are reported. If structured and human delivery state differ, ins
 - Update `worklog.template` to match
 - Commit the change yourself with a semantic message; the agent proposes it but never commits
 
-### JIRA CLI Not Found
+### JIRA Service Not Found
 
 ```bash
-chmod +x integrations/jira/jira-ticket-info.sh
-./integrations/jira/jira-ticket-info.sh summary
-./integrations/jira/jira-ticket-info.sh KD-1234
+ai-worklog service jira --help
+ai-worklog service jira summary
+ai-worklog service jira ticket KD-1234
 ```
 
 ---

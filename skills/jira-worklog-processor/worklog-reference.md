@@ -129,8 +129,8 @@ worklog/
 129: | `<service>.properties` | key=value | `jira.properties`, `newrelic.properties` |
 130: | `cookie` | raw session cookie | ServiceNow CHG API |
 131: 
-132: Usage: `source integrations/jira/credentials`, or read `jira.properties` per the
-133: consuming script's convention. Never print, echo, or paste the contents into a worklog.
+132: Jira and Tempo use `integrations/jira/jira.properties`. Never print, echo, or
+133: paste the contents into a worklog.
 134: 
 135: ### Per-Service Structure
 136: 
@@ -144,7 +144,7 @@ worklog/
 144: 
 145: | Service | Folder | Credentials | Script | Notes |
 146: |---------|--------|-------------|--------|-------|
-147: | JIRA + Tempo | `jira/` | `jira.properties` or `credentials` | `jira-ticket-info.sh` (5 modes: summary, ticket, rejected, tempo, verify) | Primary ticket interface |
+147: | JIRA + Tempo | `jira/` | `jira.properties` | `ai-worklog service jira` (8 actions) | Primary ticket interface |
 148: | New Relic | `newrelic/` | `newrelic.properties` or `credentials` | `newrelic-info.sh` (6 modes: apps, app, hosts, deployments, alerts, violations) | Monitoring investigations |
 149: | AWS | `aws/` | Profile files (export AWS_PROFILE=...) | — | One file per account/role (cue-stage, cue-prod, konto-prod) |
 150: | EKS | `eks/` | Context files (export KUBECONFIG=... or context name) | — | One file per cluster (konto, cue) |
@@ -159,7 +159,7 @@ worklog/
 159: ### Security
 160: 
 161: - All credential files MUST be in `.gitignore` — never commit tokens.
-162: - Reference credentials in worklogs by path only: "source integrations/jira/credentials"
+162: - Reference Jira credentials in worklogs by path only: `integrations/jira/jira.properties`
 - Never open, print, or echo a credential file to read its values. Pass the path to the
   consuming script.
 - Scripts may be committed; credentials never.

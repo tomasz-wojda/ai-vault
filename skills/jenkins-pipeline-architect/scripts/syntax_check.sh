@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -u
 
-MAX_JDK=17
+MAX_JDK=26
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GROOVY_SCRIPT="${SCRIPT_DIR}/syntax_check.groovy"
 JVM_SEARCH_PATH="${JVM_SEARCH_PATH:-/usr/lib/jvm}"
@@ -59,7 +59,7 @@ fi
 
 if [ -z "${SELECTED}" ]; then
     SELECTED="$(resolve_jdk)" || {
-        echo "JDK ${MAX_JDK} or lower is required (Groovy 3.x cannot read newer class files). Install it and set JAVA_HOME, e.g. macOS: JAVA_HOME=\$(/usr/libexec/java_home -v ${MAX_JDK}); Linux: JAVA_HOME=${JVM_SEARCH_PATH}/java-${MAX_JDK}-openjdk; Windows: set JAVA_HOME to the JDK ${MAX_JDK} install path."
+        echo "JDK ${MAX_JDK} or lower is required. Install it and set JAVA_HOME, e.g. macOS: JAVA_HOME=\$(/usr/libexec/java_home -v ${MAX_JDK}); Linux: JAVA_HOME=${JVM_SEARCH_PATH}/java-${MAX_JDK}-openjdk; Windows: set JAVA_HOME to the JDK ${MAX_JDK} install path."
         exit 1
     }
 fi

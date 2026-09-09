@@ -41,7 +41,7 @@ Required in the workspace (NOT in ai-vault — workspace-specific):
 worklog/                                # Active worklog files
 worklog/done/                           # Archive
 integrations/                           # Service connectivity hub (11 services)
-integrations/jira/                      #   jira-ticket-info.sh (5 modes) + credentials
+integrations/jira/                      #   jira.properties + jira-operator.json
 integrations/newrelic/                  #   newrelic-info.sh (6 modes) + credentials
 integrations/aws/                       #   AWS profile files per account
 integrations/eks/                       #   EKS context files per cluster
@@ -130,7 +130,7 @@ Read operations (always allowed): JIRA CLI, NR CLI, file reads, kubectl read-onl
 
 | Tool | Path | Key Commands |
 |------|------|-------------|
-| JIRA CLI | `integrations/jira/jira-ticket-info.sh` | `summary`, `<KEY>`, `rejected`, `tempo [DATE]`, `verify [DATE]` |
+| JIRA CLI | `ai-worklog service jira` | `summary`, `ticket <KEY>`, `rejected`, `reporter <NAME>`, `tempo [DATE]`, `verify [DATE]`, `whoami`; `log-time` is dry-run unless Write Gate authorizes `--apply` |
 | New Relic CLI | `integrations/newrelic/newrelic-info.sh` | `apps`, `app <ID>`, `hosts <ID>`, `deployments <ID>`, `alerts <ID>`, `violations` |
 | AI Worklog | `ai-worklog` on PATH | `preflight`, `ticket prepare`, `state`, `diag`, `delivery`, `closeout` |
 | Worklog template | [worklog.template](worklog.template) | Section scaffold (ships with this skill) |
@@ -141,7 +141,7 @@ Read operations (always allowed): JIRA CLI, NR CLI, file reads, kubectl read-onl
 0. Read [ticket-pickup.prompt](ticket-pickup.prompt) template. Extract `TICKET-KEY` from user input.
    Substitute `{TICKET_KEY}` in the template. Follow all steps described in the template.
 1. Run `ai-worklog preflight --ticket <TICKET-KEY>` and `ai-worklog ticket prepare <TICKET-KEY>`
-2. Run `integrations/jira/jira-ticket-info.sh <TICKET-KEY>` to fetch full ticket detail
+2. Run `ai-worklog service jira ticket <TICKET-KEY>` to fetch full ticket detail
 3. Parse output: key, summary, status, type, priority, project, assignee, reporter,
    components, labels, epic, created, updated, description, comments, linked issues, time spent
 4. **Reopened ticket check**: look for `worklog/done/*_<TICKET-KEY>*.log`
@@ -372,9 +372,9 @@ If no worklog is found for the ticket key (or no ticket key in the PR):
 1. Run `ai-worklog closeout report <TICKET-KEY>`
 2. Update STATUS to DONE
 3. Ask user for time estimate (or propose based on session complexity)
-4. Run `integrations/jira/jira-ticket-info.sh tempo` to check today's hours
-5. **WRITE GATE**: Log time via Tempo API
-6. Run `integrations/jira/jira-ticket-info.sh verify` to confirm
+4. Run `ai-worklog service jira tempo` to check today's hours
+5. Run `ai-worklog service jira log-time <KEY> <DATE> <SECONDS> <COMMENT>`, then use a **WRITE GATE** before repeating it with `--apply`
+6. Run `ai-worklog service jira verify` to confirm
 7. Update TIME LOGGED section in worklog
 8. **WRITE GATE**: Move worklog files to `worklog/done/` and update closeout state
 

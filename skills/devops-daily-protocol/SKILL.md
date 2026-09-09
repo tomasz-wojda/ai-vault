@@ -20,7 +20,7 @@ Write operations include:
 - Git commits, pushes, or any repository modifications
 
 Read operations (always allowed without approval):
-- Running JIRA CLI in any mode (summary, ticket, rejected, tempo, verify)
+- Running read-only JIRA CLI actions (`summary`, `ticket`, `rejected`, `reporter`, `tempo`, `verify`, `whoami`)
 - Running New Relic CLI in any mode (apps, app, hosts, deployments, alerts, violations)
 - Reading any workspace file
 - Running kubectl read-only commands (get, describe, top, logs)
@@ -36,15 +36,18 @@ After every interaction, append a summary to `prompt.log` (see Prompt Logging se
 36: for the full service inventory.
 37: 
 38: ### JIRA CLI
-39: **Path**: `integrations/jira/jira-ticket-info.sh`
+39: **Path**: `ai-worklog service jira`
 40: 
 41: | Mode | Command | Purpose |
 42: |------|---------|---------|
-43: | summary | `integrations/jira/jira-ticket-info.sh summary` | Board overview: in-progress, blocked, to-do, recently completed |
-44: | ticket | `integrations/jira/jira-ticket-info.sh <KEY>` | Full ticket detail: fields, description, comments, worklogs, assignment |
-45: | rejected | `integrations/jira/jira-ticket-info.sh rejected` | List rejected (Odrzucone) tickets |
-46: | tempo | `integrations/jira/jira-ticket-info.sh tempo [YYYY-MM-DD]` | Daily Tempo timesheet entries (defaults to today) |
-47: | verify | `integrations/jira/jira-ticket-info.sh verify [YYYY-MM-DD]` | Compare local worklog/ files against Tempo entries |
+43: | summary | `ai-worklog service jira summary` | Board overview: in-progress, blocked, to-do, recently completed |
+44: | ticket | `ai-worklog service jira ticket <KEY>` | Full ticket detail: fields, description, comments, links, worklogs, assignment |
+45: | rejected | `ai-worklog service jira rejected` | List rejected (Odrzucone) tickets |
+46: | reporter | `ai-worklog service jira reporter <DISPLAY-NAME>` | Tickets created by one reporter |
+47: | tempo | `ai-worklog service jira tempo [YYYY-MM-DD]` | Daily Tempo timesheet entries (defaults to today) |
+48: | verify | `ai-worklog service jira verify [YYYY-MM-DD]` | Compare local worklog/ files against Tempo entries |
+49: | whoami | `ai-worklog service jira whoami` | Validate Jira identity and authentication |
+50: | log-time | `ai-worklog service jira log-time <KEY> <DATE> <SECONDS> <COMMENT>` | Preview or apply a Tempo worklog |
 48: 
 49: ### New Relic CLI
 50: **Path**: `integrations/newrelic/newrelic-info.sh`
@@ -110,8 +113,8 @@ Steps:
 Trigger: user starts work, asks "what should I work on", or requests ticket overview.
 Steps:
 1. Run `ai-worklog day start` to reconcile structured state and active worklogs
-2. Run `integrations/jira/jira-ticket-info.sh summary` to pull current board state
-3. Run `integrations/jira/jira-ticket-info.sh tempo` to check hours already logged today
+2. Run `ai-worklog service jira summary` to pull current board state
+3. Run `ai-worklog service jira tempo` to check hours already logged today
 4. Present ticket overview grouped by board column
 5. Suggest which ticket to pick up next, prioritizing by:
    - Priority field (Wysoki > Sredni > Niski)
@@ -123,7 +126,7 @@ Steps:
 Trigger: user selects a ticket to work on, or says "pick up TICKET-KEY".
 Steps:
 1. Run `ai-worklog ticket prepare <TICKET-KEY>` and ticket-scoped preflight
-2. Run `integrations/jira/jira-ticket-info.sh <TICKET-KEY>` to fetch full ticket detail
+2. Run `ai-worklog service jira ticket <TICKET-KEY>` to fetch full ticket detail
 3. Parse the output to extract: key, summary, status, type, priority, project, assignee, reporter, components, created, updated, description
 4. Check if `worklog/done/*_TICKET-KEY*.log` exists (reopened ticket detection)
    - If found: inform user "Previous worklog found in `done/` for this ticket: [list files]. Copy back to `worklog/`?"
@@ -230,25 +233,13 @@ Steps:
    - Ask the user for their estimate, OR
    - Propose an estimate based on worklog complexity and session context
    - Time must be in seconds for the API (1h = 3600, 30m = 1800)
-3. Run `integrations/jira/jira-ticket-info.sh tempo` to show current day's logged hours
-4. **WRITE GATE**: Propose Tempo time logging. Show the exact operation:
-   - Method: POST
-   - URL: `https://jira.pl.grupa.iti/rest/tempo-timesheets/3/worklogs`
-   - Headers: `Authorization: Bearer <token from jira.properties>`, `Content-Type: application/json`
-   - Payload:
-     ```json
-     {
-       "issueKey": "<TICKET-KEY>",
-       "dateStarted": "<YYYY-MM-DD>",
-       "timeSpentSeconds": <seconds>,
-       "comment": "<brief summary of work done>"
-     }
-     ```
-   - Present the payload with actual values filled in
-5. After approval, execute the POST request
-6. Run `integrations/jira/jira-ticket-info.sh verify` to confirm the entry appears in Tempo
-7. Present verification result
-8. **WRITE GATE**: Propose moving worklog files to `done/` subfolder
+3. Run `ai-worklog service jira tempo` to show current day's logged hours
+4. Run `ai-worklog service jira log-time <TICKET-KEY> <YYYY-MM-DD> <SECONDS> <COMMENT>` and present the dry-run report
+5. **WRITE GATE**: Propose rerunning the exact command with `--apply`
+6. After approval, execute the command with `--apply`
+7. Run `ai-worklog service jira verify` to confirm the entry appears in Tempo
+8. Present verification result
+9. **WRITE GATE**: Propose moving worklog files to `done/` subfolder
    - Identify all files matching `worklog/*_TICKET-KEY*.log` (glob on ticket key)
    - List all files to be moved and their destination (`worklog/done/`)
    - After approval: create `worklog/done/` if it doesn't exist, move all matching files
@@ -258,8 +249,8 @@ Steps:
 Trigger: user ends their day, asks for daily summary, or wants to verify logged hours.
 Steps:
 1. Run `ai-worklog day end` for the structured continuation capsule
-2. Run `integrations/jira/jira-ticket-info.sh verify` to compare worklog files vs Tempo for today
-3. Run `integrations/jira/jira-ticket-info.sh tempo` to show total hours logged today
+2. Run `ai-worklog service jira verify` to compare worklog files vs Tempo for today
+3. Run `ai-worklog service jira tempo` to show total hours logged today
 4. Analyze the output:
    - **MATCHED**: worklog file exists AND Tempo entry exists — no action needed
    - **MISSING FROM TEMPO**: worklog file exists but no hours logged — flag for action, offer to log via Ticket Done mode
@@ -289,7 +280,7 @@ Every non-read operation MUST follow this protocol:
      ```
    - **API Call**: `[METHOD] URL | Payload: {JSON_SUMMARY}` (redact tokens).
      ```
-     [POST] https://jira.pl.grupa.iti/rest/tempo-timesheets/3/worklogs | Payload: {"issueKey": "DEVOPS-123", "dateStarted": "2026-03-07", "timeSpentSeconds": 3600, "comment": "..."}
+     ai-worklog service jira log-time DEVOPS-123 2026-03-07 3600 "..." --apply
      ```
    - **Git/CLI**: Exact command and target files.
      ```
@@ -338,7 +329,7 @@ All worklog files follow the `skills/jira-worklog-processor/worklog.template` st
 | NEXT ACTION | Explicit continuation point for next session |
 
 340: ### tickets.log
-341: The file `worklog/tickets.log` stores the latest output from `integrations/jira/jira-ticket-info.sh summary`. Overwrite it each time summary is run at day start.
+341: The file `worklog/tickets.log` stores the latest output from `ai-worklog service jira summary`. Overwrite it each time summary is run at day start.
 342: 
 343: ## Prompt Logging
 344: After every interaction, append to `prompt.log` at the workspace root:

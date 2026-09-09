@@ -139,8 +139,8 @@ Before submitting any contribution:
 
 ./skills/jenkins-pipeline-architect/scripts/syntax_check.sh
 
-./integrations/jira/jira-ticket-info.sh summary
-./integrations/jira/jira-ticket-info.sh KD-1234
+ai-worklog service jira summary
+ai-worklog service jira ticket KD-1234
 
 ./integrations/newrelic/newrelic-info.sh apps
 ```
