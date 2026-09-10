@@ -34,7 +34,7 @@ The skills are designed as a layered architecture. Each layer handles a distinct
 | Layer | Skill | Owns | Governs |
 |-------|-------|------|---------|
 | **L1** | `developer-protocol` | Mode state machine (RESEARCH/INNOVATE/PLAN/EXECUTE) | What actions are allowed at any given time |
-| **L2** | `devops-daily-protocol` | Tool contracts (JIRA CLI, NR CLI, kubectl), Write Gate Protocol, prompt.log | When and how tools are invoked, safety enforcement |
+| **L2** | `devops-daily-protocol` | Tool contracts (JIRA CLI, New Relic operator, kubectl), Write Gate Protocol, prompt.log | When and how tools are invoked, safety enforcement |
 | **L3** | `jira-worklog-processor` | Worklog content patterns, worklog.template, PR.log, ticket-pickup.prompt | What goes inside worklog files, content quality |
 | **L4** | `jenkins-pipeline-architect` | Jenkinsfile patterns, CPS rules, syntax_check.groovy, postJiraComment | How CI/CD pipelines are structured and validated |
 
@@ -72,7 +72,7 @@ The skills are designed as a layered architecture. Each layer handles a distinct
 #### P-02: Mode Enforcement on Investigation
 - **▶ Trigger:** User enters Investigation mode in `devops-daily-protocol`
 - **📤 Data:** Current mode state (`RESEARCH` or `INNOVATE`)
-- **Contract:** Read-only tool operations (NRQL, kubectl, NR CLI) are always `RESEARCH`. When user evaluates solution options, mode transitions to `INNOVATE` — only discussions, pros/cons allowed.
+- **Contract:** Read-only tool operations (NRQL, kubectl, New Relic operator reads) are always `RESEARCH`. When user evaluates solution options, mode transitions to `INNOVATE` — only discussions, pros/cons allowed.
 - **⚠️ Edge Case:** User asks "should we restart the pod?" during RESEARCH — this is a solution suggestion. Agent must say: "That's a solution proposal. Switch to `MODE: INNOVATE` to discuss options."
 
 #### P-03: Mode Enforcement on Write Gate
@@ -251,13 +251,13 @@ The skills are designed as a layered architecture. Each layer handles a distinct
 255: #### P-27: Pipeline Deployment Monitoring
 256: - **▶ Trigger:** Jenkins deployment job runs, user wants to track status
 257: - **📤 Data:** Build results, deployment targets, duration
-258: - **Contract:** `jenkins-pipeline-architect` provides patterns for monitoring deployment jobs (async polling, timeout handling). `devops-daily-protocol` uses NR CLI to verify deployment health post-deploy.
+258: - **Contract:** `jenkins-pipeline-architect` provides patterns for monitoring deployment jobs (async polling, timeout handling). `devops-daily-protocol` uses `ai-worklog service newrelic` to verify deployment health post-deploy.
 259: - **⚠️ Edge Case — Deployment Timeout:** `withRetry` exceeds `maxAttempts` → `devops-daily-protocol` logs timeout in worklog ACTION LOG and triggers NR violations check.
 260: 
 261: #### P-28: NR Alert → Build Correlation
 262: - **▶ Trigger:** NR violation detected during or after a Jenkins deployment
 263: - **📤 Data:** NR alert data, recent deployment history
-264: - **Contract:** `devops-daily-protocol` runs `integrations/newrelic/newrelic-info.sh violations` and `deployments <APP_ID>`. If a deployment correlates temporally with the alert, hands off to `jenkins-pipeline-architect` to inspect the deployment pipeline.
+264: - **Contract:** `devops-daily-protocol` runs `ai-worklog service newrelic violations` and `deployments <APP_ID>`. If a deployment correlates temporally with the alert, hands off to `jenkins-pipeline-architect` to inspect the deployment pipeline.
 - **⚠️ Edge Case — False Correlation:** Deployment and alert coincide but are unrelated. Agent should note correlation in FINDINGS but flag uncertainty.
 
 #### P-29: Kubernetes Issue → Pipeline Config Check
@@ -379,7 +379,7 @@ The skills are designed as a layered architecture. Each layer handles a distinct
   │                                                              │
   │  MODE: RESEARCH (continued)                                  │
   │  ┌─ L2: Investigation ──────────────────────────────────┐   │
-  │  │  NR CLI, kubectl, log analysis                        │   │
+  │  │  New Relic operator, kubectl, log analysis                        │   │
   │  │  ┌─ L4: jenkins-pipeline-architect ───────────────┐   │   │
   │  │  │  Inspect Jenkinsfile, CPS analysis             │   │   │
   │  │  └────────────────────────────────────────────────┘   │   │
@@ -465,9 +465,9 @@ The skills are designed as a layered architecture. Each layer handles a distinct
        ▼
   ┌─ L1: MODE: RESEARCH ─────────────────────────────────────┐
   │  ┌─ L2: devops-daily-protocol ──────────────────────────┐ │
-  │  │  1. newrelic-info.sh violations                       │ │
-  │  │  2. newrelic-info.sh alerts <APP_ID>                  │ │
-  │  │  3. newrelic-info.sh deployments <APP_ID>             │ │
+  │  │  1. ai-worklog service newrelic violations              │ │
+  │  │  2. ai-worklog service newrelic alert-conditions ...  │ │
+  │  │  3. ai-worklog service newrelic deployments <APP_ID>  │ │
   │  │  4. kubectl get pods (check health)                   │ │
   │  │                                                       │ │
   │  │  If deployment correlation found:                     │ │
@@ -608,13 +608,13 @@ The skills are designed as a layered architecture. Each layer handles a distinct
 255: #### P-27: Pipeline Deployment Monitoring
 256: - **▶ Trigger:** Jenkins deployment job runs, user wants to track status
 257: - **📤 Data:** Build results, deployment targets, duration
-258: - **Contract:** `jenkins-pipeline-architect` provides patterns for monitoring deployment jobs (async polling, timeout handling). `devops-daily-protocol` uses NR CLI to verify deployment health post-deploy.
+258: - **Contract:** `jenkins-pipeline-architect` provides patterns for monitoring deployment jobs (async polling, timeout handling). `devops-daily-protocol` uses `ai-worklog service newrelic` to verify deployment health post-deploy.
 259: - **⚠️ Edge Case — Deployment Timeout:** `withRetry` exceeds `maxAttempts` → `devops-daily-protocol` logs timeout in worklog ACTION LOG and triggers NR violations check.
 260: 
 261: #### P-28: NR Alert → Build Correlation
 262: - **▶ Trigger:** NR violation detected during or after a Jenkins deployment
 263: - **📤 Data:** NR alert data, recent deployment history
-264: - **Contract:** `devops-daily-protocol` runs `integrations/newrelic/newrelic-info.sh violations` and `deployments <APP_ID>`. If a deployment correlates temporally with the alert, hands off to `jenkins-pipeline-architect` to inspect the deployment pipeline.
+264: - **Contract:** `devops-daily-protocol` runs `ai-worklog service newrelic violations` and `deployments <APP_ID>`. If a deployment correlates temporally with the alert, hands off to `jenkins-pipeline-architect` to inspect the deployment pipeline.
 265: - **⚠️ Edge Case — False Correlation:** Deployment and alert coincide but are unrelated. Agent should note correlation in FINDINGS but flag uncertainty.
 266: 
 267: #### P-29: Kubernetes Issue → Pipeline Config Check
@@ -736,7 +736,7 @@ The skills are designed as a layered architecture. Each layer handles a distinct
 383:   │                                                              │
 384:   │  MODE: RESEARCH (continued)                                  │
 385:   │  ┌─ L2: Investigation ──────────────────────────────────┐   │
-386:   │  │  NR CLI, kubectl, log analysis                        │   │
+386:   │  │  New Relic operator, kubectl, log analysis                        │   │
 387:   │  │  ┌─ L4: jenkins-pipeline-architect ───────────────┐   │   │
 388:   │  │  │  Inspect Jenkinsfile, CPS analysis             │   │   │
 389:   │  │  └────────────────────────────────────────────────┘   │   │
@@ -822,9 +822,9 @@ The skills are designed as a layered architecture. Each layer handles a distinct
 469:        ▼
 470:   ┌─ L1: MODE: RESEARCH ─────────────────────────────────────┐
 471:   │  ┌─ L2: devops-daily-protocol ──────────────────────────┐ │
-472:   │  │  1. newrelic-info.sh violations                       │ │
-473:   │  │  2. newrelic-info.sh alerts <APP_ID>                  │ │
-474:   │  │  3. newrelic-info.sh deployments <APP_ID>             │ │
+472:   │  │  1. ai-worklog service newrelic violations              │ │
+473:   │  │  2. ai-worklog service newrelic alert-conditions ...  │ │
+474:   │  │  3. ai-worklog service newrelic deployments <APP_ID>  │ │
 475:   │  │  4. kubectl get pods (check health)                   │ │
 476:   │  │                                                       │ │
 477:   │  │  If deployment correlation found:                     │ │
@@ -892,7 +892,7 @@ The skills are designed as a layered architecture. Each layer handles a distinct
 539:               │
 540:               ▼
 541: ┌───────────────────────────┐     Reads/Writes     ┌───────────────────────────┐
-542: │ devops-daily-protocol     │ ──────────────────> │ integrations/             │ (JIRA CLI, NR CLI)
+542: │ devops-daily-protocol     │ ──────────────────> │ integrations/             │ (JIRA CLI, New Relic operator)
 543: └─────────────┬─────────────┘                      └───────────────────────────┘
 544:               │ Hand-off
 545:               ▼
@@ -1009,7 +1009,7 @@ The skills are designed as a layered architecture. Each layer handles a distinct
 656: | JIRA CLI returns empty/error | `devops-daily-protocol` | Retry once. If still failing, log error in worklog FINDINGS and continue with manual data. |
 657: | Tempo API 401 Unauthorized | `devops-daily-protocol` | Check `integrations/jira/jira.properties`. Surface to user. Do not retry with same token. |
 658: | Tempo API 429 Rate Limited | `devops-daily-protocol` | Wait 60 seconds, retry with exponential backoff (max 3 attempts). |
-659: | NR CLI returns no data | `devops-daily-protocol` | Log "No NR data available" in FINDINGS. Suggest manual NR UI check. |
+659: | New Relic operator returns no data | `devops-daily-protocol` | Log "No NR data available" in FINDINGS. Suggest manual NR UI check. |
 660: | `gh` CLI not authenticated | `jira-worklog-processor` | PR review workflow fails gracefully. Log error, suggest `gh auth login`. |
 661: | `syntax_check` JDK error | `jenkins-pipeline-architect` | JDK too new. Suggest running `scripts/syntax_check.sh`, or setting `JAVA_HOME` to a JDK 17 install. |
 662: | Artifactory Storage API timeout | `jenkins-pipeline-architect` | Active Choice parameter returns fallback: `["ERROR: timeout", "1.0.0"]`. |
@@ -1131,7 +1131,7 @@ When a user prompt is received, evaluate in sequence:
 | JIRA CLI returns empty/error | `devops-daily-protocol` | Retry once. If still failing, log error in worklog FINDINGS and continue with manual data. |
 | Tempo API 401 Unauthorized | `devops-daily-protocol` | Check `integrations/jira/jira.properties`. Surface to user. Do not retry with same token. |
 | Tempo API 429 Rate Limited | `devops-daily-protocol` | Wait 60 seconds, retry with exponential backoff (max 3 attempts). |
-| NR CLI returns no data | `devops-daily-protocol` | Log "No NR data available" in FINDINGS. Suggest manual NR UI check. |
+| New Relic operator returns no data | `devops-daily-protocol` | Log "No NR data available" in FINDINGS. Suggest manual NR UI check. |
 | `gh` CLI not authenticated | `jira-worklog-processor` | PR review workflow fails gracefully. Log error, suggest `gh auth login`. |
 | `syntax_check` JDK error | `jenkins-pipeline-architect` | JDK too new. Suggest running `scripts/syntax_check.sh`, or setting `JAVA_HOME` to a JDK 17 install. |
 | Artifactory Storage API timeout | `jenkins-pipeline-architect` | Active Choice parameter returns fallback: `["ERROR: timeout", "1.0.0"]`. |
@@ -1169,7 +1169,7 @@ CHECK 1: Is developer-protocol in PLAN or EXECUTE mode?
          └── Write Gates require PLAN to propose, EXECUTE to perform
          
 CHECK 2: Is the operation actually a write?
-         └── Read operations (JIRA CLI, NR CLI, file reads, kubectl get) bypass Write Gate
+         └── Read operations (JIRA CLI, New Relic operator reads, file reads, kubectl get) bypass Write Gate
          
 CHECK 3: Is the agent following the 5-step protocol?
          └── ANNOUNCE → PREVIEW → WAIT → EXECUTE → VERIFY

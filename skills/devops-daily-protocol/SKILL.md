@@ -21,45 +21,59 @@ Write operations include:
 
 Read operations (always allowed without approval):
 - Running read-only JIRA CLI actions (`summary`, `ticket`, `rejected`, `reporter`, `tempo`, `verify`, `whoami`)
-- Running New Relic CLI in any mode (apps, app, hosts, deployments, alerts, violations)
+- Running New Relic operator read actions (applications, violations, NRQL, and related reads)
 - Reading any workspace file
 - Running kubectl read-only commands (get, describe, top, logs)
 - Running `ai-worklog` preflight, prepare, report, catalog, diagnostic, and toolchain reads
 
 After every interaction, append a summary to `prompt.log` (see Prompt Logging section).
 
-31: ## Available Tools
-32: All paths are relative to the workspace root. `integrations/` is the canonical
-33: service hub: every external service has one subfolder holding its `credentials` file
-34: and, where applicable, its CLI script. See
-35: [worklog-reference.md](../jira-worklog-processor/worklog-reference.md) § "Interface Directory"
-36: for the full service inventory.
-37: 
-38: ### JIRA CLI
-39: **Path**: `ai-worklog service jira`
-40: 
-41: | Mode | Command | Purpose |
-42: |------|---------|---------|
-43: | summary | `ai-worklog service jira summary` | Board overview: in-progress, blocked, to-do, recently completed |
-44: | ticket | `ai-worklog service jira ticket <KEY>` | Full ticket detail: fields, description, comments, links, worklogs, assignment |
-45: | rejected | `ai-worklog service jira rejected` | List rejected (Odrzucone) tickets |
-46: | reporter | `ai-worklog service jira reporter <DISPLAY-NAME>` | Tickets created by one reporter |
-47: | tempo | `ai-worklog service jira tempo [YYYY-MM-DD]` | Daily Tempo timesheet entries (defaults to today) |
-48: | verify | `ai-worklog service jira verify [YYYY-MM-DD]` | Compare local worklog/ files against Tempo entries |
-49: | whoami | `ai-worklog service jira whoami` | Validate Jira identity and authentication |
-50: | log-time | `ai-worklog service jira log-time <KEY> <DATE> <SECONDS> <COMMENT>` | Preview or apply a Tempo worklog |
-48: 
-49: ### New Relic CLI
-50: **Path**: `integrations/newrelic/newrelic-info.sh`
-51: 
-52: | Mode | Command | Purpose |
-53: |------|---------|---------|
-54: | apps | `integrations/newrelic/newrelic-info.sh apps` | All applications with health status and metrics |
-55: | app | `integrations/newrelic/newrelic-info.sh app <ID>` | Single application detail |
-56: | hosts | `integrations/newrelic/newrelic-info.sh hosts <ID>` | Hosts for an application |
-57: | deployments | `integrations/newrelic/newrelic-info.sh deployments <ID>` | Deployment history for an application |
-58: | alerts | `integrations/newrelic/newrelic-info.sh alerts <ID>` | Alert conditions targeting an application |
-59: | violations | `integrations/newrelic/newrelic-info.sh violations` | All open alert violations |
+## Available Tools
+All paths are relative to the workspace root. `integrations/` is the canonical
+service hub: every external service has one subfolder holding its properties or
+credentials file and, where applicable, its operator configuration. See
+[worklog-reference.md](../jira-worklog-processor/worklog-reference.md) § "Interface Directory"
+for the full service inventory.
+
+### JIRA CLI
+**Path**: `ai-worklog service jira`
+
+| Mode | Command | Purpose |
+|------|---------|---------|
+| summary | `ai-worklog service jira summary` | Board overview: in-progress, blocked, to-do, recently completed |
+| ticket | `ai-worklog service jira ticket <KEY>` | Full ticket detail: fields, description, comments, links, worklogs, assignment |
+| rejected | `ai-worklog service jira rejected` | List rejected (Odrzucone) tickets |
+| reporter | `ai-worklog service jira reporter <DISPLAY-NAME>` | Tickets created by one reporter |
+| tempo | `ai-worklog service jira tempo [YYYY-MM-DD]` | Daily Tempo timesheet entries (defaults to today) |
+| verify | `ai-worklog service jira verify [YYYY-MM-DD]` | Compare local worklog/ files against Tempo entries |
+| whoami | `ai-worklog service jira whoami` | Validate Jira identity and authentication |
+| log-time | `ai-worklog service jira log-time <KEY> <DATE> <SECONDS> <COMMENT>` | Preview or apply a Tempo worklog |
+
+### New Relic Operator
+**Path**: `ai-worklog service newrelic`
+
+**Credentials**: `integrations/newrelic/newrelic.properties` with profile-scoped
+keys. Existing `PROFILE.newrelic.*`, canonical `PROFILE.api_key` /
+`PROFILE.account_id`, and legacy unprefixed keys remain
+compatible. Select a profile with `--profile` or `NEW_RELIC_PROFILE`.
+
+| Action | Command | Purpose |
+|------|---------|---------|
+| profiles | `ai-worklog service newrelic profiles` | List configured profiles without exposing key values |
+| auth-test | `ai-worklog service newrelic auth-test` | Validate API key and account |
+| applications | `ai-worklog service newrelic applications [--query TEXT]` | APM application inventory |
+| application | `ai-worklog service newrelic application <APP_ID>` | Single application detail |
+| hosts | `ai-worklog service newrelic hosts <APP_ID>` | Hosts for an application |
+| deployments | `ai-worklog service newrelic deployments <APP_ID>` | Deployment history for an application |
+| violations | `ai-worklog service newrelic violations` | Legacy open alert violations |
+| issues | `ai-worklog service newrelic issues [--state STATE]` | NerdGraph AI issues |
+| alert-conditions | `ai-worklog service newrelic alert-conditions [--policy ID] [--query TEXT]` | Alert condition inventory |
+| nrql | `ai-worklog service newrelic nrql "<QUERY>"` or `--file PATH` | Arbitrary NRQL through NerdGraph |
+
+Twenty read actions are always allowed under RESEARCH. Seven apply-gated
+create/update actions plus `dashboard-export` workspace writes are dry-run by
+default and require Write Gate approval before `--apply`. Delete operations
+and host-side infra mutations are outside this operator.
 
 ### Monitoring References
 - **kubectl patterns**: `zzzrecycle/monitor_commands.txt` — read this file for cluster diagnostic commands
@@ -88,7 +102,7 @@ This skill serves as the **operational lifecycle shell (Layer 2)** and orchestra
    - **Contract:** Delegates Jenkinsfile inspection, Groovy CPS analysis, and syntax validation (`syntax_check.groovy`) to `jenkins-pipeline-architect`.
 
 3. **Governance by `developer-protocol` (Mode Control):**
-   - Read operations (JIRA CLI, NR CLI, kubectl) execute under `RESEARCH` mode.
+   - Read operations (JIRA CLI, New Relic operator reads, kubectl) execute under `RESEARCH` mode.
    - All Write Gate proposals (file updates, Tempo time logging, git operations) execute under `PLAN` / `EXECUTE` modes.
 
 For the full interaction matrix, see [CROSS_SKILL_INTEGRATION.md](../CROSS_SKILL_INTEGRATION.md).
@@ -120,7 +134,7 @@ Steps:
    - Priority field (Wysoki > Sredni > Niski)
    - Ticket age (older unresolved tickets first)
    - Blocked tickets (flag but skip for pickup)
-6. If there are open NR violations, mention them: run `integrations/newrelic/newrelic-info.sh violations`
+6. If there are open NR violations, mention them: run `ai-worklog service newrelic violations`
 
 ### ROUTINE: Ticket Pickup
 Trigger: user selects a ticket to work on, or says "pick up TICKET-KEY".
@@ -177,11 +191,12 @@ Trigger: user is actively working on a ticket — researching, querying, analyzi
 This mode supports the user during active investigation. Use tools as needed:
 
 **New Relic investigation patterns**:
-- Open violations: `integrations/newrelic/newrelic-info.sh violations`
-- App-specific alerts: `integrations/newrelic/newrelic-info.sh alerts <APP_ID>`
-- App health overview: `integrations/newrelic/newrelic-info.sh apps` then `app <ID>`
-- Host inspection: `integrations/newrelic/newrelic-info.sh hosts <APP_ID>`
-- Recent deployments: `integrations/newrelic/newrelic-info.sh deployments <APP_ID>`
+- Open violations: `ai-worklog service newrelic violations`
+- App-specific alert conditions: `ai-worklog service newrelic alert-conditions --query <NAME>` or filter by policy/entity after `application <APP_ID>`
+- App health overview: `ai-worklog service newrelic applications` then `application <APP_ID>`
+- Host inspection: `ai-worklog service newrelic hosts <APP_ID>`
+- Recent deployments: `ai-worklog service newrelic deployments <APP_ID>`
+- Direct NRQL: `ai-worklog service newrelic nrql "<QUERY>"` or `--file PATH`
 
 **Kubernetes diagnostics** (read `zzzrecycle/monitor_commands.txt` for full list):
 - Prefer a matching read-only pack from `ai-worklog diag list`; run it with `ai-worklog diag run` and reference its evidence bundle in FINDINGS
@@ -328,44 +343,45 @@ All worklog files follow the `skills/jira-worklog-processor/worklog.template` st
 | TIME LOGGED | Tempo entries and session durations |
 | NEXT ACTION | Explicit continuation point for next session |
 
-340: ### tickets.log
-341: The file `worklog/tickets.log` stores the latest output from `ai-worklog service jira summary`. Overwrite it each time summary is run at day start.
-342: 
-343: ## Prompt Logging
-344: After every interaction, append to `prompt.log` at the workspace root:
-345: ```
-346: --- PROMPT LOG ENTRY ---
-347: TIMESTAMP: YYYY-MM-DD
-348: USER: <concise summary of what the user asked>
-349: ASSISTANT: <mode used> — <concise summary of actions taken and outcomes>
-350:   <key details: files created, commands run, time logged, etc.>
-351: --- END PROMPT LOG ENTRY ---
-352: ```
-353: 
-354: For multi-tab sessions, use sub-sections:
-355: ```
-356: --- PROMPT LOG ENTRY ---
-357: TIMESTAMP: YYYY-MM-DD
-358: USER: Multiple topics in single session.
-359: 
-360: TAB 1: <tab description>
-361:   <details>
-362: 
-363: TAB 2: <tab description>
-364:   <details>
-365: --- END PROMPT LOG ENTRY ---
-366: ```
-367: 
-368: ## New Relic Integration
-369: ### Investigation Decision Tree
-370: | Need | Command |
-371: |------|---------|
-372: | Check for active incidents | `integrations/newrelic/newrelic-info.sh violations` |
-373: | Find alert conditions for an app | `integrations/newrelic/newrelic-info.sh alerts <APP_ID>` |
-374: | Check app health and metrics | `integrations/newrelic/newrelic-info.sh app <APP_ID>` |
-375: | List all apps to find an ID | `integrations/newrelic/newrelic-info.sh apps` |
-376: | Check which hosts serve an app | `integrations/newrelic/newrelic-info.sh hosts <APP_ID>` |
-377: | Check recent deployments | `integrations/newrelic/newrelic-info.sh deployments <APP_ID>` |
+### tickets.log
+The file `worklog/tickets.log` stores the latest output from `ai-worklog service jira summary`. Overwrite it each time summary is run at day start.
+
+## Prompt Logging
+After every interaction, append to `prompt.log` at the workspace root:
+```
+--- PROMPT LOG ENTRY ---
+TIMESTAMP: YYYY-MM-DD
+USER: <concise summary of what the user asked>
+ASSISTANT: <mode used> — <concise summary of actions taken and outcomes>
+  <key details: files created, commands run, time logged, etc.>
+--- END PROMPT LOG ENTRY ---
+```
+
+For multi-tab sessions, use sub-sections:
+```
+--- PROMPT LOG ENTRY ---
+TIMESTAMP: YYYY-MM-DD
+USER: Multiple topics in single session.
+
+TAB 1: <tab description>
+  <details>
+
+TAB 2: <tab description>
+  <details>
+--- END PROMPT LOG ENTRY ---
+```
+
+## New Relic Integration
+### Investigation Decision Tree
+| Need | Command |
+|------|---------|
+| Check for active incidents | `ai-worklog service newrelic violations` |
+| Find alert conditions for an app | `ai-worklog service newrelic alert-conditions --query <NAME>` |
+| Check app health and metrics | `ai-worklog service newrelic application <APP_ID>` |
+| List all apps to find an ID | `ai-worklog service newrelic applications` |
+| Check which hosts serve an app | `ai-worklog service newrelic hosts <APP_ID>` |
+| Check recent deployments | `ai-worklog service newrelic deployments <APP_ID>` |
+| Run ad hoc NRQL | `ai-worklog service newrelic nrql "<QUERY>"` |
 | Audit NR config on a remote host | Read `zzzrecycle/nr-audit.sh`, run on target host via SSH |
 
 ### Common NRQL Patterns

@@ -25,7 +25,7 @@ Before submitting any contribution:
 
 - [ ] Read the existing `SKILL.md` for consistency in formatting and terminology
 - [ ] Ensure all workflow modes are documented (RESEARCH → INNOVATE → PLAN → EXECUTE)
-- [ ] Verify tool contracts (JIRA CLI, NR CLI, Tempo API) are accurate
+- [ ] Verify tool contracts (JIRA CLI, New Relic operator, Tempo API) are accurate
 - [ ] Update `worklog.template` if the worklog structure changes
 - [ ] Add examples to `examples.md` for new patterns
 
@@ -142,7 +142,7 @@ Before submitting any contribution:
 ai-worklog service jira summary
 ai-worklog service jira ticket KD-1234
 
-./integrations/newrelic/newrelic-info.sh apps
+ai-worklog service newrelic applications
 ```
 
 ### PR Review Testing

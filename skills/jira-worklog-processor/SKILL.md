@@ -42,7 +42,7 @@ worklog/                                # Active worklog files
 worklog/done/                           # Archive
 integrations/                           # Service connectivity hub (11 services)
 integrations/jira/                      #   jira.properties + jira-operator.json
-integrations/newrelic/                  #   newrelic-info.sh (6 modes) + credentials
+integrations/newrelic/                  #   newrelic.properties (profile-scoped API keys)
 integrations/aws/                       #   AWS profile files per account
 integrations/eks/                       #   EKS context files per cluster
 integrations/jenkins/                   #   Jenkins credentials
@@ -116,7 +116,7 @@ The file exists so new sessions can reference it as a startup instruction set. T
 All operations are **read-only by default**. Any write requires the Write Gate Protocol.
 
 Write operations: creating/editing files, HTTP POST/PUT/DELETE, git commits/pushes.
-Read operations (always allowed): JIRA CLI, NR CLI, file reads, kubectl read-only.
+Read operations (always allowed): JIRA CLI, New Relic operator reads, file reads, kubectl read-only.
 
 ### Write Gate Protocol
 
@@ -131,7 +131,7 @@ Read operations (always allowed): JIRA CLI, NR CLI, file reads, kubectl read-onl
 | Tool | Path | Key Commands |
 |------|------|-------------|
 | JIRA CLI | `ai-worklog service jira` | `summary`, `ticket <KEY>`, `rejected`, `reporter <NAME>`, `tempo [DATE]`, `verify [DATE]`, `whoami`; `log-time` is dry-run unless Write Gate authorizes `--apply` |
-| New Relic CLI | `integrations/newrelic/newrelic-info.sh` | `apps`, `app <ID>`, `hosts <ID>`, `deployments <ID>`, `alerts <ID>`, `violations` |
+| New Relic operator | `ai-worklog service newrelic` | Read actions include `profiles`, `applications`, `application <ID>`, `hosts <ID>`, `deployments <ID>`, `violations`, `alert-conditions`, `nrql`; mutations and `dashboard-export --apply` require Write Gate |
 | AI Worklog | `ai-worklog` on PATH | `preflight`, `ticket prepare`, `state`, `diag`, `delivery`, `closeout` |
 | Worklog template | [worklog.template](worklog.template) | Section scaffold (ships with this skill) |
 | kubectl patterns | `zzzrecycle/monitor_commands.txt` | Cluster diagnostics |
@@ -415,7 +415,7 @@ Follow the developer protocol modes. Declare mode at the start of every response
 
 | Mode | Allowed | Forbidden |
 |------|---------|-----------|
-| RESEARCH | Read files, JIRA/NR CLI, questions | Suggestions, planning, implementation |
+| RESEARCH | Read files, JIRA/New Relic operator reads, questions | Suggestions, planning, implementation |
 | INNOVATE | Options, pros/cons, discussion | Detailed plans, code, implementation |
 | PLAN | File paths, checklists, specs | Code implementation |
 | EXECUTE | Exactly what the plan says | Deviations, creative additions |

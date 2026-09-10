@@ -85,7 +85,7 @@ ai-vault/
 | Skill | Source | Governs |
 |-------|--------|---------|
 | `developer-protocol` | `skills/developer-protocol/` | Mode discipline: RESEARCH → INNOVATE → PLAN → EXECUTE |
-| `devops-daily-protocol` | `skills/devops-daily-protocol/` | Lifecycle shell, tool contracts (JIRA CLI, NR CLI), Write Gate Protocol |
+| `devops-daily-protocol` | `skills/devops-daily-protocol/` | Lifecycle shell, tool contracts (JIRA CLI, New Relic operator), Write Gate Protocol |
 | `jenkins-pipeline-architect` | `skills/jenkins-pipeline-architect/` | Jenkins scripted pipelines, JIRA notifications from CI/CD |
 | `jira-worklog-processor` | `skills/jira-worklog-processor/` | Content generation: worklog sections, FINDINGS patterns, solution options, PR review workflow |
 
@@ -98,7 +98,7 @@ ai-vault/
 ├─────────────────────────────────────────────────┤
 │  devops-daily-protocol                          │
 │  Lifecycle: pickup, investigation, done, verify │
-│  Tools: JIRA CLI, NR CLI, Tempo API             │
+│  Tools: JIRA CLI, New Relic operator, Tempo API │
 ├─────────────────────────────────────────────────┤
 │  jira-worklog-processor                         │
 │  Content: FINDINGS patterns, solution options,   │
@@ -155,7 +155,7 @@ ai-vault/
 │   └── done/                       ← archive for completed tickets
 ├── integrations/                   ← service connectivity hub
 │   ├── jira/credentials            ← JIRA + Tempo tokens (NEVER commit)
-│   ├── newrelic/credentials        ← NR API keys (NEVER commit)
+│   ├── newrelic/newrelic.properties ← NR API keys (NEVER commit)
 │   ├── aws/                        ← AWS profile files per account
 │   └── eks/                        ← EKS context files per cluster
 ├── zzzrecycle/monitor_commands.txt ← kubectl diagnostic patterns
@@ -233,14 +233,14 @@ When a PR is merged:
 | JIRA reads (`ai-worklog service jira`) | Always | `summary`, `ticket`, `rejected`, `reporter`, `tempo`, `verify`, `whoami` |
 | Tempo log-time dry run | Always | Omit `--apply` |
 | Tempo log-time apply | Write Gate | Add `--apply` only after approval |
-| NR CLI (`integrations/newrelic/newrelic-info.sh`) | Always | 6 modes: `apps`, `app <ID>`, `hosts <ID>`, `deployments <ID>`, `alerts <ID>`, `violations` |
+| New Relic operator (`ai-worklog service newrelic`) | Always for reads | 20 read actions; profile keys in `integrations/newrelic/newrelic.properties`; 7 apply-gated writes and `dashboard-export --apply` require Write Gate |
 | File reads | Always | No restrictions |
 | kubectl (read-only) | Always | Use patterns from `zzzrecycle/monitor_commands.txt` |
 
 ### Never Commit
 
 - `integrations/jira/jira.properties` — JIRA + Tempo token
-- `integrations/newrelic/credentials` — NR API keys
+- `integrations/newrelic/newrelic.properties` — NR API keys
 
 The repository `.gitignore` already excludes `**/credentials`, `**/*.properties`,
 `**/cookie`, `worklog/`, `tmp/`, `prompt.log`, and `PR.log`. Verify with
@@ -254,7 +254,7 @@ Follow the developer protocol modes. Declare mode at the start of every response
 
 | Mode | Allowed | Forbidden |
 |------|---------|-----------|
-| **RESEARCH** | Read files, JIRA/NR CLI, questions | Suggestions, planning, implementation |
+| **RESEARCH** | Read files, JIRA/New Relic operator reads, questions | Suggestions, planning, implementation |
 | **INNOVATE** | Options, pros/cons, discussion | Detailed plans, code, implementation |
 | **PLAN** | File paths, checklists, specs | Code implementation |
 | **EXECUTE** | Exactly what the plan says | Deviations, creative additions |
