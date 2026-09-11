@@ -1,6 +1,6 @@
 ---
 name: developer-protocol
-version: "1.0.0"
+version: "1.0.1"
 description: Enforces a strict multi-mode workflow (RESEARCH, INNOVATE, PLAN, EXECUTE) to ensure codebase integrity and prevent unauthorized modifications.
 ---
 
@@ -67,4 +67,4 @@ This skill acts as the **governance layer (Layer 1)** across all sibling skills:
 - **Overlay on `jenkins-pipeline-architect`:**  
   Scripted pipeline refactoring or Groovy code edits must pass through `PLAN` mode before code changes are applied in `EXECUTE` mode.
 
-For the complete interaction matrix, see [CROSS_SKILL_INTEGRATION.md](../CROSS_SKILL_INTEGRATION.md).
+For the inter-layer rules (R-01..R-24), see [CROSS_SKILL_INTEGRATION.md](../CROSS_SKILL_INTEGRATION.md) § 2.

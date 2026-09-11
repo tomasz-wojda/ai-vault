@@ -12,7 +12,7 @@ Welcome to **AI Vault**, the single-repo platform for multi-agent workflow autom
 - **A JDK** — required by the Jenkins syntax check. There is an upper bound, not a fixed version: Groovy cannot read class files from JDKs newer than it supports. The ceiling is `MAX_JDK` in `skills/jenkins-pipeline-architect/scripts/syntax_check.sh`; the wrapper resolves a suitable install itself.
 - **Groovy 3.x** — for `syntax_check.groovy`
 - **GitHub CLI (`gh`)** — for PR reviews and ticket workflows
-- **ai-worklog-framework 0.2.0+** — executable preflight, state, diagnostics, and reports
+- **ai-worklog-framework 0.13.0+** — executable preflight, state, diagnostics, and reports. The `service` namespace the skills call arrived on 2026-09-09; earlier builds have no `service` command at all. Confirm with `ai-worklog --version`, which also prints the Groovy and Java versions in use
 - **Groovy runtime selected in `ai-worklog`** — the `service` operators (`jira`, `jenkins`, `newrelic`) exist only there; the Python runtime rejects `service` outright. Check with `ai-worklog config runtime`, set with `ai-worklog config runtime groovy`. It defaults to `groovy` when `~/.ai-worklog/config.json` is absent, so this usually needs no action
 
 ### First Steps

@@ -1,6 +1,6 @@
 ---
 name: devops-daily-protocol
-version: "1.1.1"
+version: "1.1.2"
 description: >-
   Orchestrates daily DevOps operations: pulling JIRA tickets, selecting work items,
   creating structured worklog files, integrating ai-worklog and New Relic monitoring,
@@ -126,7 +126,7 @@ This skill serves as the **operational lifecycle shell (Layer 2)** and orchestra
    - Read operations (JIRA CLI, New Relic operator reads, kubectl) execute under `RESEARCH` mode.
    - All Write Gate proposals (file updates, Tempo time logging, git operations) execute under `PLAN` / `EXECUTE` modes.
 
-For the full interaction matrix, see [CROSS_SKILL_INTEGRATION.md](../CROSS_SKILL_INTEGRATION.md).
+For the inter-layer rules (R-01..R-24), see [CROSS_SKILL_INTEGRATION.md](../CROSS_SKILL_INTEGRATION.md) § 2.
 
 ## Workflow Routines
 

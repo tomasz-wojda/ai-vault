@@ -1,6 +1,6 @@
 ---
 name: jenkins-pipeline-architect
-version: "1.0.2"
+version: "1.0.3"
 description: Use this when creating or editing Jenkinsfiles, defining CI/CD stages, or troubleshooting Groovy-based scripted pipelines.
 ---
 
@@ -162,7 +162,9 @@ Usage:
 
 JDK requirement: at or below the ceiling set by `MAX_JDK` in `scripts/syntax_check.sh`.
 Read the value from the script rather than assuming one — it moves as Groovy gains
-support for newer class file formats.
+support for newer class file formats. The wrapper passes that ceiling to the Groovy
+script through `AI_VAULT_MAX_JDK`, so the two cannot disagree. Invoked directly, as
+on Windows, the Groovy script falls back to its own literal.
 
 The wrapper resolves a JDK in this order: `JAVA_HOME` if it is within range, then
 `JAVA_HOME_17` (a legacy variable name; any in-range version is accepted), then

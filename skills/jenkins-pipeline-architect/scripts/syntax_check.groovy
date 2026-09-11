@@ -2,10 +2,20 @@ import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.Phases
 
-def MAX_SUPPORTED_JDK = 26
+// syntax_check.sh passes its MAX_JDK through AI_VAULT_MAX_JDK and is authoritative.
+// The literal below is the fallback for direct invocation, which is how Windows runs
+// this script; keep the two in step.
+def FALLBACK_MAX_SUPPORTED_JDK = 26
+def ceilingFromWrapper = System.getenv('AI_VAULT_MAX_JDK')
+def MAX_SUPPORTED_JDK = (ceilingFromWrapper ==~ /\d+/)
+    ? ceilingFromWrapper.toInteger()
+    : FALLBACK_MAX_SUPPORTED_JDK
 
+// "1.8" means Java 8; anything else leads with its major version.
 def jdkVersion = System.getProperty('java.specification.version')
-def jdkMajor = jdkVersion.contains('.') ? jdkVersion.split('\\.')[0].toInteger() : jdkVersion.toInteger()
+def jdkMajor = jdkVersion.startsWith('1.')
+    ? jdkVersion.split('\\.')[1].toInteger()
+    : jdkVersion.split('\\.')[0].toInteger()
 
 if (jdkMajor > MAX_SUPPORTED_JDK) {
     println "UNSUPPORTED JDK: running on JDK ${jdkVersion}, requires JDK ${MAX_SUPPORTED_JDK} or lower. Set JAVA_HOME to a supported JDK installation and re-run."

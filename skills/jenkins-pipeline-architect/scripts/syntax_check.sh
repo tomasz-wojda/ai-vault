@@ -74,4 +74,5 @@ if [ -z "${SELECTED}" ]; then
 fi
 
 export JAVA_HOME="${SELECTED}"
+export AI_VAULT_MAX_JDK="${MAX_JDK}"
 exec groovy "${GROOVY_SCRIPT}" "$@"
