@@ -1,6 +1,6 @@
 ---
 name: jenkins-pipeline-architect
-version: "1.0.1"
+version: "1.0.2"
 description: Use this when creating or editing Jenkinsfiles, defining CI/CD stages, or troubleshooting Groovy-based scripted pipelines.
 ---
 
@@ -164,11 +164,13 @@ JDK requirement: at or below the ceiling set by `MAX_JDK` in `scripts/syntax_che
 Read the value from the script rather than assuming one — it moves as Groovy gains
 support for newer class file formats.
 
-The wrapper resolves a JDK in this order: `JAVA_HOME` if it is at or below the
-ceiling, then `JAVA_HOME_17` (a legacy variable name; any version at or below the
-ceiling is accepted), then `/usr/libexec/java_home` on macOS, then
-`$JVM_SEARCH_PATH` (default `/usr/lib/jvm`). If none is found it exits 1 naming
-the required version.
+The wrapper resolves a JDK in this order: `JAVA_HOME` if it is within range, then
+`JAVA_HOME_17` (a legacy variable name; any in-range version is accepted), then
+`/usr/libexec/java_home` on macOS, then `$JVM_SEARCH_PATH` (default
+`/usr/lib/jvm`). The last two search downward from `MAX_JDK` and select the
+highest in-range install rather than requiring one exact version. In range means
+between `MIN_JDK` and `MAX_JDK` inclusive, both set at the top of the script. If
+nothing qualifies it exits 1 naming the range.
 
 Failure signature `Unsupported class file major version <N>` means the JDK is newer
 than the bundled Groovy can read. Use the wrapper, or point `JAVA_HOME` at a JDK at
