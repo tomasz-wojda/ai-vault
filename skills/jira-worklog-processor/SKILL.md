@@ -1,6 +1,6 @@
 ---
 name: jira-worklog-processor
-version: "1.1.0"
+version: "1.1.1"
 description: >-
   Process JIRA tickets into structured worklog files following a multi-phase
   research-first workflow. Extends devops-daily-protocol with content generation
@@ -118,13 +118,15 @@ All operations are **read-only by default**. Any write requires the Write Gate P
 Write operations: creating/editing files, HTTP POST/PUT/DELETE, git commits/pushes.
 Read operations (always allowed): JIRA CLI, New Relic operator reads, file reads, kubectl read-only.
 
-### Write Gate Protocol
+The Write Gate Protocol itself — its five steps and the required PREVIEW
+formats — is owned and specified by `devops-daily-protocol`; see
+[its SKILL.md](../devops-daily-protocol/SKILL.md) § "Write Gate Protocol". Every
+write named in this skill routes through that gate, including worklog creation,
+section updates, `PR.log` appends and checklist transitions.
 
-1. **ANNOUNCE** the operation type
-2. **PREVIEW** full content (file content, API payload, git command)
-3. **WAIT** — "Proceed? (yes/no)"
-4. **EXECUTE** only after user confirms
-5. **VERIFY** success (re-read file, re-run verify)
+The gate's WAIT step is a safety requirement and is not suspended by the
+response-style directive in `.rules` §5. See
+[CROSS_SKILL_INTEGRATION.md](../CROSS_SKILL_INTEGRATION.md) R-05, R-06 and R-23.
 
 ## Available Tools
 
