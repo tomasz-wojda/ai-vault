@@ -68,10 +68,12 @@ ai-vault/
 │   │   └── scripts/
 │   │       ├── syntax_check.sh   ← macOS/Linux entry point (resolves a supported JDK)
 │   │       └── syntax_check.groovy
-│   └── jira-worklog-processor/   ← content generation patterns
-│       ├── SKILL.md              ← worklog structure, FINDINGS/SOLUTIONS format
-│       ├── ticket-pickup.prompt  ← static template (read-only)
-│       └── examples.md           ← completed-ticket walkthroughs
+│   ├── jira-worklog-processor/   ← content generation patterns
+│   │   ├── SKILL.md              ← worklog structure, FINDINGS/SOLUTIONS format
+│   │   ├── ticket-pickup.prompt  ← static template (read-only)
+│   │   └── examples.md           ← completed-ticket walkthroughs
+│   └── pr-review-comments/       ← evidence-backed PR comments
+│       └── SKILL.md              ← proof bars, severity, inline anchoring
 ├── scripts/validate-skills.sh    ← repo integrity checks
 ├── .rules                         ← single truth for Rules
 ├── .gitignore                     ← excludes credentials and session artifacts
@@ -90,6 +92,7 @@ ai-vault/
 | `devops-daily-protocol` | `skills/devops-daily-protocol/` | Lifecycle shell, tool contracts (JIRA CLI, New Relic operator), Write Gate Protocol |
 | `jenkins-pipeline-architect` | `skills/jenkins-pipeline-architect/` | Jenkins scripted pipelines, JIRA notifications from CI/CD |
 | `jira-worklog-processor` | `skills/jira-worklog-processor/` | Content generation: worklog sections, FINDINGS patterns, solution options, PR review workflow |
+| `pr-review-comments` | `skills/pr-review-comments/` | Authoring and posting evidence-backed PR comments: proof bars, severity calibration, inline anchoring, suggestion blocks |
 
 ### How Skills Layer
 
@@ -105,11 +108,18 @@ ai-vault/
 │  jira-worklog-processor                         │
 │  Content: FINDINGS patterns, solution options,   │
 │  gap analysis, gate plans, cross-ticket refs    │
-├─────────────────────────────────────────────────┤
-│  jenkins-pipeline-architect                     │
-│  CI/CD: scripted pipelines, JIRA notifications   │
-└─────────────────────────────────────────────────┘
+├───────────────────────┬─────────────────────────┤
+│ jenkins-pipeline-     │ pr-review-comments      │
+│ architect             │ PR comments: proof bars,│
+│ CI/CD: pipelines,     │ severity, inline        │
+│ JIRA notifications    │ anchoring               │
+└───────────────────────┴─────────────────────────┘
 ```
+
+The bottom two are peer specialists, invoked by surface rather than stacked: one
+for Jenkins work, one for posting review comments. See
+`skills/CROSS_SKILL_INTEGRATION.md` § 1 for the layer contract and § 2 for the
+twenty-seven rules that govern the handoffs.
 
 When multiple skills are active, `devops-daily-protocol` governs *when* and *how* to create/update files; `jira-worklog-processor` governs *what goes inside them*.
 
@@ -137,12 +147,14 @@ ai-vault/
 │   │   └── scripts/
 │   │       ├── syntax_check.sh
 │   │       └── syntax_check.groovy
-│   └── jira-worklog-processor/   ← content generation patterns
-│       ├── SKILL.md
-│       ├── ticket-pickup.prompt  ← static template (read-only)
-│       ├── worklog.template      ← worklog scaffold
-│       ├── examples.md           ← completed-ticket walkthroughs
-│       └── worklog-reference.md  ← section specifications
+│   ├── jira-worklog-processor/   ← content generation patterns
+│   │   ├── SKILL.md
+│   │   ├── ticket-pickup.prompt  ← static template (read-only)
+│   │   ├── worklog.template      ← worklog scaffold
+│   │   ├── examples.md           ← completed-ticket walkthroughs
+│   │   └── worklog-reference.md  ← section specifications
+│   └── pr-review-comments/       ← evidence-backed PR comments
+│       └── SKILL.md
 ├── scripts/validate-skills.sh    ← repo integrity checks
 ├── .rules                         ← single truth for Rules
 ├── .gitignore
