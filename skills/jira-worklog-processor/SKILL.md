@@ -1,6 +1,6 @@
 ---
 name: jira-worklog-processor
-version: "1.1.3"
+version: "1.1.4"
 description: >-
   Process JIRA tickets into structured worklog files following a multi-phase
   research-first workflow. Extends devops-daily-protocol with content generation
@@ -56,7 +56,7 @@ integrations/datadog/                   #   Datadog API keys
 .ai-worklog/config.json                 # Framework workspace configuration
 .ai-worklog/state/<TICKET-KEY>.json     # Machine-readable ticket lifecycle
 .ai-worklog/evidence/                   # Redacted diagnostic evidence
-integrations/eks/monitor_commands.txt         # kubectl diagnostic patterns
+integrations/eks/monitor_commands.txt    # kubectl diagnostic patterns
 tmp/                                    # Per-ticket scratch artifacts
 prompt.log                              # Session audit trail (append-only)
 ```
@@ -135,6 +135,7 @@ response-style directive in `.rules` §5. See
 |------|------|-------------|
 | JIRA CLI | `ai-worklog service jira` | `summary`, `ticket <KEY>`, `rejected`, `reporter <NAME>`, `tempo [DATE]`, `verify [DATE]`, `whoami`; `log-time` is dry-run unless Write Gate authorizes `--apply` |
 | New Relic operator | `ai-worklog service newrelic` | Read actions include `profiles`, `applications`, `application <ID>`, `hosts <ID>`, `deployments <ID>`, `violations`, `alert-conditions`, `nrql`; mutations and `dashboard-export --apply` require Write Gate |
+| Jenkins operator | `ai-worklog service jenkins` | 14 read actions grouped as controller (`controllers`, `health`, `whoami`, `nodes`, `queue`), jobs (`jobs`, `job`, `seed`, `views`), builds (`artifacts`), config (`plugins`, `credentials`, `credential-domains`) and `syntax-check`; `download-artifact` requires Write Gate and `--apply` |
 | Automox operator | `ai-worklog service automox` | 14 read actions including `profiles`, `orgs`, `groups`, `devices`, `device <ID>`, `device-packages`, `activity`, `patch-summary`, `policies`, `policy`, `policy-stats`, `device-queue`; `policy-run`, `worklet-create`, `policy-delete`, `device-move` and `policy-add-group` require Write Gate and `--apply` |
 | AI Worklog | `ai-worklog` on PATH | `preflight`, `ticket prepare`, `state`, `diag`, `delivery`, `closeout` |
 | Worklog template | [worklog.template](worklog.template) | Section scaffold (ships with this skill) |

@@ -1,6 +1,6 @@
 ---
 name: jenkins-pipeline-architect
-version: "1.0.3"
+version: "1.0.4"
 description: Use this when creating or editing Jenkinsfiles, defining CI/CD stages, or troubleshooting Groovy-based scripted pipelines.
 ---
 
@@ -154,6 +154,13 @@ Windows — invoke the Groovy script directly with `JAVA_HOME` already pointing 
 ```
 groovy <skill-dir>\scripts\syntax_check.groovy [files...]
 ```
+
+`ai-worklog service jenkins syntax-check <files...>` is a front end to this same
+wrapper, not a second implementation: the framework resolves
+`skills/jenkins-pipeline-architect/scripts/syntax_check.sh` from a configured
+`syntax_check_script`, then `ai_vault_root`, then a resolved vault root, and
+reports BLOCKED if it cannot find it. This skill owns the implementation. Either
+entry point satisfies the mandatory check.
 
 Usage:
 - No arguments: auto-discovers `Jenkinsfile` and `Jenkinsfile*.groovy` in the current directory

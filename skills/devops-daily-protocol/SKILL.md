@@ -1,6 +1,6 @@
 ---
 name: devops-daily-protocol
-version: "1.1.4"
+version: "1.1.5"
 description: >-
   Orchestrates daily DevOps operations: pulling JIRA tickets, selecting work items,
   creating structured worklog files, integrating ai-worklog and New Relic monitoring,
@@ -102,6 +102,33 @@ Fourteen read actions are always allowed under RESEARCH. Five actions accept
 `--apply` and are dry-run without it — `policy-run`, `worklet-create`,
 `policy-delete`, `device-move` and `policy-add-group` — and each requires Write
 Gate approval. `policy-delete` additionally requires `--confirm-name` to match.
+
+### Jenkins Operator
+**Path**: `ai-worklog service jenkins`
+
+**Credentials**: `integrations/jenkins/jenkins.properties` or `credentials`.
+Controllers are named in configuration; `controllers` lists them without
+exposing secrets.
+
+| Group | Actions | Purpose |
+|-------|---------|---------|
+| Controller | `controllers`, `health`, `whoami`, `nodes`, `queue` | Controller inventory, operating mode, authenticated identity, executor and queue state |
+| Jobs | `jobs`, `job`, `seed`, `views` | Job listing and filtering, one job's status and recent builds, seed-job result, views |
+| Builds | `artifacts`, `download-artifact` | Artifacts of a selected build; download one by exact relative path |
+| Config | `plugins`, `credentials`, `credential-domains` | Installed plugins and required-plugin verification, credential metadata, credential domains |
+| Validation | `syntax-check <files...>` | Validate scripted Jenkinsfiles |
+
+Fourteen read actions are always allowed under RESEARCH. Only
+`download-artifact` accepts `--apply`; it is dry-run without it and writes to
+the workspace, so it requires Write Gate approval. `credentials` and
+`credential-domains` return metadata only — never secret values.
+
+`syntax-check` is not a second implementation. The framework resolves and runs
+this repo's own `skills/jenkins-pipeline-architect/scripts/syntax_check.sh`,
+preferring a configured `syntax_check_script`, then `ai_vault_root`, then a
+resolved vault root. It reports BLOCKED when that script cannot be found. Either
+entry point therefore applies the same grammar check and the same `MAX_JDK`
+ceiling; use whichever is at hand and satisfy R-16 once.
 
 ### Monitoring References
 - **kubectl patterns**: `integrations/eks/monitor_commands.txt` — read this file for cluster diagnostic commands

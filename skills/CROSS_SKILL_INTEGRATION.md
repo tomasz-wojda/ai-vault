@@ -80,7 +80,7 @@ wins when two of them collide.
 ### 2.4 Pipeline Work — owner `jenkins-pipeline-architect`
 
 - **R-15** Pipeline code is written only in EXECUTE. Creation and modification both pass through PLAN first, including single-line changes and CPS refactoring.
-- **R-16** `scripts/syntax_check.sh` runs after every pipeline edit and is mandatory; failure reverts to PLAN per R-02. It validates Groovy grammar only, so a pass does not mean the pipeline works — that limitation belongs in the ACTION LOG. The wrapper resolves a JDK at or below the `MAX_JDK` ceiling set in that script; invoking `syntax_check.groovy` directly under a newer JDK fails with `Unsupported class file major version <N>`.
+- **R-16** `scripts/syntax_check.sh` runs after every pipeline edit and is mandatory; failure reverts to PLAN per R-02. `ai-worklog service jenkins syntax-check` is a front end to that same script, not a second implementation, so either entry point discharges this rule. It validates Groovy grammar only, so a pass does not mean the pipeline works — that limitation belongs in the ACTION LOG. The wrapper resolves a JDK at or below the `MAX_JDK` ceiling set in that script; invoking `syntax_check.groovy` directly under a newer JDK fails with `Unsupported class file major version <N>`.
 - **R-17** A `vars/*.groovy` change affects every consumer of the shared library and requires regression coverage for all of them within the same change.
 
 ### 2.5 Framework Integration — owner `ai-worklog-framework`
@@ -356,3 +356,4 @@ CHECK 3: Is the Jenkinsfile a valid Groovy file?
 | 3.1 | 2026-09-11 | Removed the hardcoded JDK 17 requirement. The ceiling is `MAX_JDK` in `syntax_check.sh`, which had already moved to 26 while every document still named 17. |
 | 3.2 | 2026-09-11 | Added R-24: the `ai-worklog service` operators require the Groovy runtime. Previously undocumented anywhere, so switching to the Python runtime silently removed every L2 tool contract. |
 | 3.3 | 2026-09-11 | Documented the Automox operator, implemented in the framework on 2026-09-10 and until now absent from every skill. Added it to R-24's operator list. |
+| 3.4 | 2026-09-11 | Documented the Jenkins operator's 15 actions, of which only `credentials` had been described. Noted in R-16 that its `syntax-check` is a front end to this repo's `syntax_check.sh`, not a rival implementation. |
