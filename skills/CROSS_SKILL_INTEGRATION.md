@@ -97,7 +97,7 @@ wins when two of them collide.
 
 ### 2.7 Runtime Precondition
 
-- **R-24** The `ai-worklog service` operators — `jira`, `jenkins`, `newrelic` — exist only in the Groovy runtime. Under the Python runtime the command is rejected before reaching an operator, with `invalid choice: 'service'`, which removes every L2 tool contract at once. Every other framework command (R-18 to R-22) works under both runtimes. The runtime resolves from `--runtime`, then `AI_WORKLOG_RUNTIME`, then the `runtime` key in `~/.ai-worklog/config.json`, defaulting to `groovy` when no config file exists. Verify with `ai-worklog config runtime` before relying on any tool contract.
+- **R-24** The `ai-worklog service` operators — `jira`, `jenkins`, `newrelic`, `automox` — exist only in the Groovy runtime. Under the Python runtime the command is rejected before reaching an operator, with `invalid choice: 'service'`, which removes every L2 tool contract at once. Every other framework command (R-18 to R-22) works under both runtimes. The runtime resolves from `--runtime`, then `AI_WORKLOG_RUNTIME`, then the `runtime` key in `~/.ai-worklog/config.json`, defaulting to `groovy` when no config file exists. Verify with `ai-worklog config runtime` before relying on any tool contract.
 
 ### 2.8 Composite Sequences
 
@@ -355,3 +355,4 @@ CHECK 3: Is the Jenkinsfile a valid Groovy file?
 | 3.0 | 2026-09-11 | Replaced the 53-pattern matrix with 23 inter-layer rules (R-01..R-23). Corrected the mode/section mapping: structural worklog sections are not mode-gated. Added R-23, fixing the unresolved conflict between the Write Gate's confirmation step and the `.rules` §5 style directive. |
 | 3.1 | 2026-09-11 | Removed the hardcoded JDK 17 requirement. The ceiling is `MAX_JDK` in `syntax_check.sh`, which had already moved to 26 while every document still named 17. |
 | 3.2 | 2026-09-11 | Added R-24: the `ai-worklog service` operators require the Groovy runtime. Previously undocumented anywhere, so switching to the Python runtime silently removed every L2 tool contract. |
+| 3.3 | 2026-09-11 | Documented the Automox operator, implemented in the framework on 2026-09-10 and until now absent from every skill. Added it to R-24's operator list. |

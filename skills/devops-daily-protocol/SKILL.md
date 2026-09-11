@@ -1,6 +1,6 @@
 ---
 name: devops-daily-protocol
-version: "1.1.2"
+version: "1.1.3"
 description: >-
   Orchestrates daily DevOps operations: pulling JIRA tickets, selecting work items,
   creating structured worklog files, integrating ai-worklog and New Relic monitoring,
@@ -22,6 +22,7 @@ Write operations include:
 Read operations (always allowed without approval):
 - Running read-only JIRA CLI actions (`summary`, `ticket`, `rejected`, `reporter`, `tempo`, `verify`, `whoami`)
 - Running New Relic operator read actions (applications, violations, NRQL, and related reads)
+- Running Automox operator read actions (orgs, groups, devices, packages, activity, patch summaries, policies)
 - Reading any workspace file
 - Running kubectl read-only commands (get, describe, top, logs)
 - Running `ai-worklog` preflight, prepare, report, catalog, diagnostic, and toolchain reads
@@ -70,10 +71,37 @@ compatible. Select a profile with `--profile` or `NEW_RELIC_PROFILE`.
 | alert-conditions | `ai-worklog service newrelic alert-conditions [--policy ID] [--query TEXT]` | Alert condition inventory |
 | nrql | `ai-worklog service newrelic nrql "<QUERY>"` or `--file PATH` | Arbitrary NRQL through NerdGraph |
 
-Twenty read actions are always allowed under RESEARCH. Seven apply-gated
-create/update actions plus `dashboard-export` workspace writes are dry-run by
-default and require Write Gate approval before `--apply`. Delete operations
-and host-side infra mutations are outside this operator.
+Nineteen read actions are always allowed under RESEARCH. Eight actions accept
+`--apply` and are dry-run without it — the seven create/update mutations plus
+`dashboard-export`, which writes to the workspace — and each requires Write Gate
+approval. Delete operations and host-side infra mutations are outside this
+operator.
+
+### Automox Operator
+**Path**: `ai-worklog service automox`
+
+**Credentials**: `integrations/automox/automox.properties` with profile-scoped
+keys, alongside `token` and `server-id`. Select a profile with `--profile`.
+
+| Action | Command | Purpose |
+|------|---------|---------|
+| profiles | `ai-worklog service automox profiles` | List configured profiles without exposing key values |
+| auth-test | `ai-worklog service automox auth-test` | Validate the API token |
+| orgs | `ai-worklog service automox orgs` | Accessible organizations |
+| groups | `ai-worklog service automox groups [--query TEXT]` | Server group inventory |
+| devices | `ai-worklog service automox devices [--group ID]` | Device inventory with group, name, connection filters |
+| device | `ai-worklog service automox device <ID-or-HOSTNAME>` | Single device detail |
+| device-packages | `ai-worklog service automox device-packages <ID>` | Packages on one device, filterable by state |
+| activity | `ai-worklog service automox activity` | Events within a date range |
+| patch-summary | `ai-worklog service automox patch-summary` | Patch activity summary for a date range |
+| policies | `ai-worklog service automox policies [--query TEXT]` | Policy inventory |
+| policy-stats | `ai-worklog service automox policy-stats` | Policy execution statistics |
+| device-queue | `ai-worklog service automox device-queue <ID>` | Command queue for one device |
+
+Fourteen read actions are always allowed under RESEARCH. Five actions accept
+`--apply` and are dry-run without it — `policy-run`, `worklet-create`,
+`policy-delete`, `device-move` and `policy-add-group` — and each requires Write
+Gate approval. `policy-delete` additionally requires `--confirm-name` to match.
 
 ### Monitoring References
 - **kubectl patterns**: `zzzrecycle/monitor_commands.txt` — read this file for cluster diagnostic commands
@@ -92,16 +120,16 @@ and host-side infra mutations are outside this operator.
 #### Runtime Requirement — `service` needs the Groovy runtime
 
 `ai-worklog` ships two runtimes. Every framework command listed above works under
-both, but the **`service` operators — `jira`, `jenkins`, `newrelic` — exist only
-in the Groovy runtime.** Under the Python runtime the command is rejected before
-it reaches an operator:
+both, but the **`service` operators — `jira`, `jenkins`, `newrelic`, `automox` —
+exist only in the Groovy runtime.** Under the Python runtime the command is
+rejected before it reaches an operator:
 
 ```
 ai-worklog: error: argument command: invalid choice: 'service'
 ```
 
 That failure takes out every tool contract in this skill: board reads, Tempo,
-`log-time`, and all New Relic investigation. The runtime resolves from
+`log-time`, and all New Relic and Automox investigation. The runtime resolves from
 `--runtime`, then `AI_WORKLOG_RUNTIME`, then the `runtime` key in
 `~/.ai-worklog/config.json`, defaulting to `groovy` when no config file exists.
 

@@ -30,6 +30,7 @@ worklog/
     ├── github/                         #   GitHub tokens
     ├── argocd/                         #   Argo CD credentials
     ├── artifactory/                    #   Artifactory credentials
+    ├── automox/                        #   automox.properties (profile-scoped) + token
     ├── ssh/                            #   SSH configs / jump hosts
     ├── snow/                           #   ServiceNow session
     └── datadog/                        #   Datadog API keys
@@ -132,15 +133,11 @@ Two naming conventions are in use. Both are accepted:
 Jira and Tempo use `integrations/jira/jira.properties`. Never print, echo, or
 paste the contents into a worklog.
 
-### Per-Service Structure
-
-```
-integrations/<service>/
-├── credentials                 # or <service>.properties / cookie — never commit
-└── <service>-info.sh           # CLI script (optional, service-specific)
-```
-
 ### Service Inventory
+
+The canonical set is defined by `services` in the framework's
+`shared/workspace-init.json`; `ai-worklog workspace init` creates exactly these.
+Credential file naming is covered by "Credential File Format" above.
 
 | Service | Folder | Credentials | Operator | Notes |
 |---------|--------|-------------|----------|-------|
@@ -152,9 +149,16 @@ integrations/<service>/
 | GitHub | `github/` | `github.properties` or `credentials` (GH_TOKEN) | — | gh CLI, API calls |
 | Argo CD | `argocd/` | `credentials` (ARGOCD_SERVER, ARGOCD_AUTH_TOKEN) | — | GitOps sync status |
 | Artifactory | `artifactory/` | `credentials` (ARTIFACTORY_URL, ARTIFACTORY_TOKEN) | — | Artifact version queries |
+| Automox | `automox/` | `automox.properties` (profile-scoped), `token`, `server-id` | `ai-worklog service automox` (19 actions) | Endpoint patch management. 14 read-only; 5 accept `--apply` and are dry-run without it (`policy-run`, `worklet-create`, `policy-delete`, `device-move`, `policy-add-group`). Groovy runtime only |
 | SSH | `ssh/` | Config files per environment (cue-stage, cue-prod) | — | Jump host configs, ProxyJump |
 | ServiceNow | `snow/` | `cookie` (session cookie for CHG API) | — | Change management |
 | Datadog | `datadog/` | `credentials` (DD_API_KEY, DD_APP_KEY) | — | If Datadog adopted per KD-6945 |
+
+A workspace may also hold service folders outside the canonical set. `workspace
+init` leaves them untouched and preflight has no checks for them, so they carry no
+operator and no tool contract. Two are in use today: `confluence/`
+(`confluence.properties` plus a `confluence-page.groovy` helper) and `puls/` (a
+single `helper` file; purpose not recorded anywhere in either repository).
 
 ### Security
 

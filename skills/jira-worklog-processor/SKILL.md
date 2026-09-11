@@ -1,6 +1,6 @@
 ---
 name: jira-worklog-processor
-version: "1.1.1"
+version: "1.1.2"
 description: >-
   Process JIRA tickets into structured worklog files following a multi-phase
   research-first workflow. Extends devops-daily-protocol with content generation
@@ -40,7 +40,7 @@ Required in the workspace (NOT in ai-vault — workspace-specific):
 ```
 worklog/                                # Active worklog files
 worklog/done/                           # Archive
-integrations/                           # Service connectivity hub (11 services)
+integrations/                           # Service connectivity hub (12 services)
 integrations/jira/                      #   jira.properties + jira-operator.json
 integrations/newrelic/                  #   newrelic.properties (profile-scoped API keys)
 integrations/aws/                       #   AWS profile files per account
@@ -49,6 +49,7 @@ integrations/jenkins/                   #   Jenkins credentials
 integrations/github/                    #   GitHub tokens
 integrations/argocd/                    #   Argo CD credentials
 integrations/artifactory/               #   Artifactory credentials
+integrations/automox/                   #   automox.properties (profile-scoped) + token
 integrations/ssh/                       #   SSH configs / jump hosts
 integrations/snow/                      #   ServiceNow session cookie
 integrations/datadog/                   #   Datadog API keys
@@ -134,6 +135,7 @@ response-style directive in `.rules` §5. See
 |------|------|-------------|
 | JIRA CLI | `ai-worklog service jira` | `summary`, `ticket <KEY>`, `rejected`, `reporter <NAME>`, `tempo [DATE]`, `verify [DATE]`, `whoami`; `log-time` is dry-run unless Write Gate authorizes `--apply` |
 | New Relic operator | `ai-worklog service newrelic` | Read actions include `profiles`, `applications`, `application <ID>`, `hosts <ID>`, `deployments <ID>`, `violations`, `alert-conditions`, `nrql`; mutations and `dashboard-export --apply` require Write Gate |
+| Automox operator | `ai-worklog service automox` | 14 read actions including `profiles`, `orgs`, `groups`, `devices`, `device <ID>`, `device-packages`, `activity`, `patch-summary`, `policies`, `policy`, `policy-stats`, `device-queue`; `policy-run`, `worklet-create`, `policy-delete`, `device-move` and `policy-add-group` require Write Gate and `--apply` |
 | AI Worklog | `ai-worklog` on PATH | `preflight`, `ticket prepare`, `state`, `diag`, `delivery`, `closeout` |
 | Worklog template | [worklog.template](worklog.template) | Section scaffold (ships with this skill) |
 | kubectl patterns | `zzzrecycle/monitor_commands.txt` | Cluster diagnostics |

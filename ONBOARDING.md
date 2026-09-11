@@ -239,6 +239,7 @@ directive in `.rules` §5 (see `skills/CROSS_SKILL_INTEGRATION.md` R-23).
 | Tempo log-time dry run | Always | Omit `--apply` |
 | Tempo log-time apply | Write Gate | Add `--apply` only after approval |
 | New Relic operator (`ai-worklog service newrelic`) | Always for reads | 27 actions: 19 read-only; 8 accept `--apply` and are dry-run without it (`dashboard-export` plus 7 create/update mutations), each requiring a Write Gate. Profile keys in `integrations/newrelic/newrelic.properties` |
+| Automox operator (`ai-worklog service automox`) | Always for reads | 19 actions: 14 read-only; 5 accept `--apply` and are dry-run without it (`policy-run`, `worklet-create`, `policy-delete`, `device-move`, `policy-add-group`), each requiring a Write Gate. Profile keys in `integrations/automox/automox.properties` |
 | File reads | Always | No restrictions |
 | kubectl (read-only) | Always | Use patterns from `zzzrecycle/monitor_commands.txt` |
 
