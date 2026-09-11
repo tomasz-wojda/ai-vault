@@ -1,6 +1,6 @@
 ---
 name: devops-daily-protocol
-version: "1.1.0"
+version: "1.1.1"
 description: >-
   Orchestrates daily DevOps operations: pulling JIRA tickets, selecting work items,
   creating structured worklog files, integrating ai-worklog and New Relic monitoring,
@@ -88,6 +88,27 @@ and host-side infra mutations are outside this operator.
 - `ai-worklog delivery status <KEY>` and `closeout report <KEY>` — read-only reconciliation reports
 - `ai-worklog diag list|run` — registered read-only diagnostics and redacted evidence
 - `ai-worklog day start|end` and `toolchain check|list|env` — daily and runtime reports
+
+#### Runtime Requirement — `service` needs the Groovy runtime
+
+`ai-worklog` ships two runtimes. Every framework command listed above works under
+both, but the **`service` operators — `jira`, `jenkins`, `newrelic` — exist only
+in the Groovy runtime.** Under the Python runtime the command is rejected before
+it reaches an operator:
+
+```
+ai-worklog: error: argument command: invalid choice: 'service'
+```
+
+That failure takes out every tool contract in this skill: board reads, Tempo,
+`log-time`, and all New Relic investigation. The runtime resolves from
+`--runtime`, then `AI_WORKLOG_RUNTIME`, then the `runtime` key in
+`~/.ai-worklog/config.json`, defaulting to `groovy` when no config file exists.
+
+Check it with `ai-worklog config runtime`, which prints `Runtime: groovy`. If it
+prints `python`, set it back with `ai-worklog config runtime groovy` before
+running any routine below. Treat that write as a Write Gate — it changes global
+configuration outside the workspace.
 
 ## Cross-Skill Handoffs
 

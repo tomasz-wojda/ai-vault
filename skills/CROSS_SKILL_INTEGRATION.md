@@ -90,6 +90,7 @@ wins when two of them collide.
 - **R-20** State mutations are previewed in PLAN, applied with `--apply` in EXECUTE, and verified read-only through `delivery status`. `.ai-worklog/state/*.json` is never hand-edited.
 - **R-21** Structured JSON leads automation and the worklog leads narrative. Where the two contradict, the contradiction is surfaced rather than silently overwritten. Jira remains the authority on board state.
 - **R-22** `closeout report` precedes the Tempo and archival Write Gates. Evidence produced by `diag run` is redacted and referenced by bundle path from FINDINGS or ACTION LOG.
+- **R-24** The `ai-worklog service` operators (`jira`, `jenkins`, `newrelic`) exist only in the Groovy runtime; under the Python runtime the command fails with `invalid choice: 'service'`. Every other framework command in R-18 to R-22 works under both. The runtime resolves from `--runtime`, then `AI_WORKLOG_RUNTIME`, then `~/.ai-worklog/config.json`, defaulting to `groovy`. Verify with `ai-worklog config runtime` before relying on any L2 tool contract.
 
 ### 2.6 Precedence
 

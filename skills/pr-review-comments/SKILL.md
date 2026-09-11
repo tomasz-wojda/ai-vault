@@ -1,6 +1,6 @@
 ---
 name: pr-review-comments
-version: "1.0.0"
+version: "1.1.0"
 description: >-
   Author and post evidence-backed GitHub PR review comments. Proves each defect
   by executing read-only checks against the live system, quantifies severity
@@ -48,7 +48,8 @@ not on the PR.
 - [ ] 7. Check for an existing comment on the same defect
 - [ ] 8. Write the body to a file
 - [ ] 9. Post anchored to the line(s)
-- [ ] 10. Report the permalink back to the user
+- [ ] 10. Record what was posted in PR.log
+- [ ] 11. Report the permalink back to the user
 ```
 
 ### 1. Pin the head SHA
@@ -153,7 +154,54 @@ gh api "repos/<org>/<repo>/pulls/<N>/comments" -X POST \
 
 `-F` for integers, `-f` for strings. Getting this backwards yields a 422.
 
-### 10. Report back
+### 10. Record what was posted in PR.log
+
+`PR.log` is owned by [jira-worklog-processor](../jira-worklog-processor/SKILL.md)
+§ "PR.log Entry Format", and appends route through the Write Gate Protocol in
+[devops-daily-protocol](../devops-daily-protocol/SKILL.md). This skill does not
+redefine the entry — it contributes one block to it.
+
+Add a `POSTED COMMENTS` block after `OBSERVATIONS`, because `OBSERVATIONS` is
+the analysis and this is the subset that was raised publicly:
+
+```
+POSTED COMMENTS:
+  1. <severity> — <one-line verdict>
+     <path>:<line or start-end>
+     https://github.com/<org>/<repo>/pull/<N>#discussion_r<id>
+     Suggestion: yes|no   From: OBSERVATION <n>
+  2. ...
+
+NOT POSTED (kept in chat):
+  - <finding> — <which of the three bars it failed>
+```
+
+The `NOT POSTED` list is the point of the block. The three-bar rule means some
+findings never reach the PR, and a review record that only shows what was said
+publicly loses the reasoning about what was deliberately withheld. Omit the
+list only when every finding was posted.
+
+Cross-reference in both directions: each posted comment names the
+`OBSERVATION` it came from, and an observation that produced no comment is
+accounted for in `NOT POSTED`.
+
+### Follow-up on merge
+
+When the merge follow-up runs, append outcomes under the original entry rather
+than editing the `POSTED COMMENTS` lines:
+
+```
+POSTED COMMENTS FOLLOW-UP (YYYY-MM-DDTHH:MM):
+  1. r<id> — suggestion applied in <sha>
+  2. r<id> — resolved without change, author response: <summary>
+  3. r<id> — still open at merge
+```
+
+`still open at merge` is worth recording explicitly. A defect that was raised,
+not addressed, and merged anyway is the single most useful thing to find in
+this log six months later.
+
+### 11. Report back
 
 Give the user the `html_url` permalink and one sentence on what the comment
 argues. When several comments were posted, say which is substantive and which
@@ -258,7 +306,9 @@ Defect: a Slack message under-reports an overflow count.
 
 ## Constraints
 
-- Posting a comment is the only write. Never commit, never push.
+- Posting a comment is the only write to the PR. Never commit, never push.
 - Never mutate the target system to produce evidence.
 - Append the exchange to `prompt.log` with a timestamp after posting, including
   the comment id and permalink.
+- The `PR.log` append is a Write Gate operation owned by `devops-daily-protocol`.
+  `prompt.log` and `PR.log` are both append-only; never rewrite an entry.
