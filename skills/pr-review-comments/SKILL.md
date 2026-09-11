@@ -1,6 +1,6 @@
 ---
 name: pr-review-comments
-version: "1.1.0"
+version: "1.2.0"
 description: >-
   Author and post evidence-backed GitHub PR review comments. Proves each defect
   by executing read-only checks against the live system, quantifies severity
@@ -39,20 +39,68 @@ not on the PR.
 ## Workflow
 
 ```
-- [ ] 1. Pin the head SHA
-- [ ] 2. Establish the mechanism from the source
-- [ ] 3. Prove it with a read-only execution
-- [ ] 4. Bound the blast radius
-- [ ] 5. Measure the probability
-- [ ] 6. Verify exact line numbers and whitespace
-- [ ] 7. Check for an existing comment on the same defect
-- [ ] 8. Write the body to a file
-- [ ] 9. Post anchored to the line(s)
-- [ ] 10. Record what was posted in PR.log
-- [ ] 11. Report the permalink back to the user
+- [ ] 1. Load prior context from PR.log
+- [ ] 2. Pin the head SHA
+- [ ] 3. Establish the mechanism from the source
+- [ ] 4. Prove it with a read-only execution
+- [ ] 5. Bound the blast radius
+- [ ] 6. Measure the probability
+- [ ] 7. Verify exact line numbers and whitespace
+- [ ] 8. Check for an existing comment on the same defect
+- [ ] 9. Write the body to a file
+- [ ] 10. Post anchored to the line(s)
+- [ ] 11. Record what was posted in PR.log
+- [ ] 12. Report the permalink back to the user
 ```
 
-### 1. Pin the head SHA
+### 1. Load prior context from PR.log
+
+Read before reviewing. `PR.log` at the workspace root is the local record of
+every previous review, and a PR is often revisited after the author pushes.
+Reviewing without it means re-deriving findings that were already settled.
+
+The file is gitignored and local-only. If it does not exist, skip this step.
+
+Entries begin with a `--- YYYY-MM-DDTHH:MM ---` header followed by
+`PR #<N> | <org>/<repo>`. Split on the timestamp header, not on the `====`
+rule — the rule is not present between every entry.
+
+```bash
+rg -n "^PR #<N> \| <org>/<repo>$" PR.log
+```
+
+```bash
+python3 - PR.log "PR #<N> | <org>/<repo>" <<'PY'
+import re, sys
+text = open(sys.argv[1], encoding='utf-8').read()
+for entry in re.split(r'(?m)^(?=--- 20\d\d-)', text):
+    if sys.argv[2] in entry:
+        print(entry.rstrip())
+PY
+```
+
+Widen the search when the same PR has no entry:
+
+| Looking for | Command |
+|-------------|---------|
+| Other PRs in the same repo | `rg -n "^PR #[0-9]+ \| <org>/<repo>$" PR.log` |
+| Prior findings on the same file | `rg -n -B2 "<path>" PR.log` |
+| Defects that shipped unfixed | `rg -n -A3 "still open at merge" PR.log` |
+
+What each part of a prior entry changes about this review:
+
+| Section found | Effect |
+|---------------|--------|
+| `POSTED COMMENTS` | Already raised. Do not post again; check whether the author responded |
+| `NOT POSTED` | Already weighed and withheld. Do not re-litigate without new evidence |
+| `OBSERVATIONS` | Analysis already done. Re-verify against the new head SHA rather than redoing it |
+| `FOLLOW-UP … still open at merge` | A known defect shipped. Likely still present, and precedent for how it was handled |
+| Entries for other PRs, same repo | Recurring patterns and risks the team has already accepted |
+
+State what was carried over in the review output, so the user can tell a fresh
+finding from a repeated one.
+
+### 2. Pin the head SHA
 
 Every inline comment must be anchored to a commit. Re-fetch it each time; the
 author may have pushed since the review started.
@@ -61,7 +109,7 @@ author may have pushed since the review started.
 gh pr view <N> --repo <org>/<repo> --json headRefOid,changedFiles,files,state
 ```
 
-### 2. Establish the mechanism
+### 3. Establish the mechanism
 
 Read the source at that SHA, not at `develop` or `master`.
 
@@ -73,7 +121,7 @@ State the defect as a causal chain, not an adjective. "Line 91 derives the
 overflow from the capped array while line 98 renders the header from the
 uncapped total" beats "the count is wrong".
 
-### 3. Prove it
+### 4. Prove it
 
 Replay the exact call or command shape the code uses, read-only. Prefer:
 
@@ -88,7 +136,7 @@ Replay the exact call or command shape the code uses, read-only. Prefer:
 Never mutate anything to prove a point. If the proof requires a write, say so
 and stop.
 
-### 4. Bound the blast radius
+### 5. Bound the blast radius
 
 Explicitly state what the defect cannot reach. This is what lets the author
 triage in seconds. Typical bounds:
@@ -97,13 +145,13 @@ triage in seconds. Typical bounds:
 - Latent, not live, because the job pins a different branch
 - Unreachable from CI, because the pipeline never passes that flag
 
-### 5. Measure the probability
+### 6. Measure the probability
 
 Use real data from the target system to say how often the defect fires. A
 measured rarity is what converts "bug" into "nit", and it is the difference
 between a comment that blocks a merge and one that does not.
 
-### 6. Verify exact lines
+### 7. Verify exact lines
 
 Diff line numbers must match the file at the head SHA, and a suggestion block
 must reproduce the original indentation byte for byte.
@@ -118,13 +166,17 @@ for i in range(88,92): print(i+1,'|',repr(lines[i]))
 
 `repr()` rather than `cat`, so tabs and trailing spaces are visible.
 
-### 7. Check for duplicates
+### 8. Check for duplicates
 
 ```bash
 gh api repos/<org>/<repo>/pulls/<N>/comments --jq '.[] | {id, path, line, user: .user.login}'
 ```
 
-### 8-9. Write to a file, then post
+This and step 1 catch different things. GitHub shows what is on the PR now,
+including comments from other reviewers; `PR.log` additionally shows what was
+considered and deliberately withheld. Run both.
+
+### 9-10. Write to a file, then post
 
 Write the body to a file and pass it with `-F body=@<file>`. Never inline a
 multi-paragraph body in the shell; backticks, `${}` and quotes will be mangled.
@@ -154,7 +206,7 @@ gh api "repos/<org>/<repo>/pulls/<N>/comments" -X POST \
 
 `-F` for integers, `-f` for strings. Getting this backwards yields a 422.
 
-### 10. Record what was posted in PR.log
+### 11. Record what was posted in PR.log
 
 `PR.log` is owned by [jira-worklog-processor](../jira-worklog-processor/SKILL.md)
 § "PR.log Entry Format", and appends route through the Write Gate Protocol in
@@ -201,7 +253,7 @@ POSTED COMMENTS FOLLOW-UP (YYYY-MM-DDTHH:MM):
 not addressed, and merged anyway is the single most useful thing to find in
 this log six months later.
 
-### 11. Report back
+### 12. Report back
 
 Give the user the `html_url` permalink and one sentence on what the comment
 argues. When several comments were posted, say which is substantive and which
@@ -283,6 +335,10 @@ gh api repos/<org>/<repo>/pulls/comments/<comment-id> --jq '.body'
 
 **Claiming an unverified consequence.** If the downstream effect depends on
 which branch a job tracks, check the branch before describing the impact.
+
+**Reviewing without loading `PR.log`.** On a revisited PR this re-derives
+settled findings and risks re-posting a comment, or re-raising something that
+was already weighed and withheld.
 
 ## Worked example
 

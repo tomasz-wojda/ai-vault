@@ -49,7 +49,7 @@ The skills are designed as a layered architecture. Each layer handles a distinct
 
 ## 2. Inter-Layer Rules
 
-Twenty-three rules, grouped by the concern they govern. Each states a constraint
+Twenty-four rules, grouped by the concern they govern. Each states a constraint
 that binds at decision time. The skill named as owner holds the canonical
 statement of the rule; this document fixes how the layers compose and which rule
 wins when two of them collide.
@@ -90,13 +90,16 @@ wins when two of them collide.
 - **R-20** State mutations are previewed in PLAN, applied with `--apply` in EXECUTE, and verified read-only through `delivery status`. `.ai-worklog/state/*.json` is never hand-edited.
 - **R-21** Structured JSON leads automation and the worklog leads narrative. Where the two contradict, the contradiction is surfaced rather than silently overwritten. Jira remains the authority on board state.
 - **R-22** `closeout report` precedes the Tempo and archival Write Gates. Evidence produced by `diag run` is redacted and referenced by bundle path from FINDINGS or ACTION LOG.
-- **R-24** The `ai-worklog service` operators (`jira`, `jenkins`, `newrelic`) exist only in the Groovy runtime; under the Python runtime the command fails with `invalid choice: 'service'`. Every other framework command in R-18 to R-22 works under both. The runtime resolves from `--runtime`, then `AI_WORKLOG_RUNTIME`, then `~/.ai-worklog/config.json`, defaulting to `groovy`. Verify with `ai-worklog config runtime` before relying on any L2 tool contract.
 
 ### 2.6 Precedence
 
 - **R-23** Where rules conflict, precedence runs safety, then mode, then content, then style. Concretely: the Write Gate's WAIT step is a safety requirement and is outside the scope of the `.rules` §5 prohibition on questions. A confirmation prompt before a write is mandatory regardless of response-style directives.
 
-### 2.7 Composite Sequences
+### 2.7 Runtime Precondition
+
+- **R-24** The `ai-worklog service` operators — `jira`, `jenkins`, `newrelic` — exist only in the Groovy runtime. Under the Python runtime the command is rejected before reaching an operator, with `invalid choice: 'service'`, which removes every L2 tool contract at once. Every other framework command (R-18 to R-22) works under both runtimes. The runtime resolves from `--runtime`, then `AI_WORKLOG_RUNTIME`, then the `runtime` key in `~/.ai-worklog/config.json`, defaulting to `groovy` when no config file exists. Verify with `ai-worklog config runtime` before relying on any tool contract.
+
+### 2.8 Composite Sequences
 
 The rules above compose into three recurring sequences. Each step names the
 owning layer.
@@ -351,3 +354,4 @@ CHECK 3: Is the Jenkinsfile a valid Groovy file?
 | 2.1 | 2026-08-10 | Added ai-worklog preflight, state, diagnostics, daily, and closeout contracts |
 | 3.0 | 2026-09-11 | Replaced the 53-pattern matrix with 23 inter-layer rules (R-01..R-23). Corrected the mode/section mapping: structural worklog sections are not mode-gated. Added R-23, fixing the unresolved conflict between the Write Gate's confirmation step and the `.rules` §5 style directive. |
 | 3.1 | 2026-09-11 | Removed the hardcoded JDK 17 requirement. The ceiling is `MAX_JDK` in `syntax_check.sh`, which had already moved to 26 while every document still named 17. |
+| 3.2 | 2026-09-11 | Added R-24: the `ai-worklog service` operators require the Groovy runtime. Previously undocumented anywhere, so switching to the Python runtime silently removed every L2 tool contract. |

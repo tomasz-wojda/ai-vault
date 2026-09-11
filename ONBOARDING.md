@@ -13,6 +13,7 @@ Welcome to **AI Vault**, the single-repo platform for multi-agent workflow autom
 - **Groovy 3.x** — for `syntax_check.groovy`
 - **GitHub CLI (`gh`)** — for PR reviews and ticket workflows
 - **ai-worklog-framework 0.2.0+** — executable preflight, state, diagnostics, and reports
+- **Groovy runtime selected in `ai-worklog`** — the `service` operators (`jira`, `jenkins`, `newrelic`) exist only there; the Python runtime rejects `service` outright. Check with `ai-worklog config runtime`, set with `ai-worklog config runtime groovy`. It defaults to `groovy` when `~/.ai-worklog/config.json` is absent, so this usually needs no action
 
 ### First Steps
 
