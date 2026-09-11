@@ -47,7 +47,8 @@ regression-testing obligations: `skills/developer-protocol/SKILL.md`.
 - Run `./scripts/validate-skills.sh` before any commit touching `skills/` or
   `.rules`. It must exit 0.
 - Run `skills/jenkins-pipeline-architect/scripts/syntax_check.sh` after editing any
-  Jenkinsfile. JDK 17 or lower is required; the wrapper resolves it.
+  Jenkinsfile. A JDK at or below the script's `MAX_JDK` ceiling is required; the
+  wrapper resolves one itself.
 - Keep each `SKILL.md` under 500 lines. Move detail into a sibling `references/`
   file and point to it from `SKILL.md`.
 - A skill's frontmatter `name` must equal its directory name, or no host will

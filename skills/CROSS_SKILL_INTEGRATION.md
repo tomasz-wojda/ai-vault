@@ -80,7 +80,7 @@ wins when two of them collide.
 ### 2.4 Pipeline Work — owner `jenkins-pipeline-architect`
 
 - **R-15** Pipeline code is written only in EXECUTE. Creation and modification both pass through PLAN first, including single-line changes and CPS refactoring.
-- **R-16** `scripts/syntax_check.sh` runs after every pipeline edit and is mandatory; failure reverts to PLAN per R-02. It validates Groovy grammar only, so a pass does not mean the pipeline works — that limitation belongs in the ACTION LOG. The wrapper resolves a JDK 17 or lower; invoking `syntax_check.groovy` directly under a newer JDK fails with `Unsupported class file major version <N>`.
+- **R-16** `scripts/syntax_check.sh` runs after every pipeline edit and is mandatory; failure reverts to PLAN per R-02. It validates Groovy grammar only, so a pass does not mean the pipeline works — that limitation belongs in the ACTION LOG. The wrapper resolves a JDK at or below the `MAX_JDK` ceiling set in that script; invoking `syntax_check.groovy` directly under a newer JDK fails with `Unsupported class file major version <N>`.
 - **R-17** A `vars/*.groovy` change affects every consumer of the shared library and requires regression coverage for all of them within the same change.
 
 ### 2.5 Framework Integration — owner `ai-worklog-framework`
@@ -255,7 +255,7 @@ When a user prompt is received, evaluate in sequence:
 | Tempo API 429 Rate Limited | `devops-daily-protocol` | Wait 60 seconds, retry with exponential backoff (max 3 attempts). |
 | New Relic operator returns no data | `devops-daily-protocol` | Log "No NR data available" in FINDINGS. Suggest manual NR UI check. |
 | `gh` CLI not authenticated | `jira-worklog-processor` | PR review workflow fails gracefully. Log error, suggest `gh auth login`. |
-| `syntax_check` JDK error | `jenkins-pipeline-architect` | JDK too new. Suggest running `scripts/syntax_check.sh`, or setting `JAVA_HOME` to a JDK 17 install. |
+| `syntax_check` JDK error | `jenkins-pipeline-architect` | JDK newer than the script's `MAX_JDK` ceiling. Suggest running `scripts/syntax_check.sh`, or setting `JAVA_HOME` to an install at or below it. |
 | Artifactory Storage API timeout | `jenkins-pipeline-architect` | Active Choice parameter returns fallback: `["ERROR: timeout", "1.0.0"]`. |
 
 ### 5.4 Prompt.log Conflicts
@@ -322,11 +322,13 @@ CHECK 3: Is the worklog file path correct?
 ### Symptom: Jenkins Syntax Check Fails
 
 ```
-CHECK 1: Is a JDK 17 (or lower) installed?
-         └── Groovy 3.x cannot read class files from newer JDKs
-         └── macOS: /usr/libexec/java_home -v 17
+CHECK 1: Is an installed JDK at or below the ceiling?
+         └── Ceiling is MAX_JDK in scripts/syntax_check.sh; read it there
+         └── Groovy cannot read class files from JDKs newer than it supports
+         └── macOS: /usr/libexec/java_home -v <ceiling>
          └── Linux: $JVM_SEARCH_PATH (default /usr/lib/jvm)
-         └── Any platform: export JAVA_HOME_17
+         └── Any platform: export JAVA_HOME_17 (legacy name, any
+             version at or below the ceiling is accepted)
 
 CHECK 2: Is the syntax check accessible?
          └── Wrapper: skills/jenkins-pipeline-architect/scripts/syntax_check.sh
@@ -347,3 +349,4 @@ CHECK 3: Is the Jenkinsfile a valid Groovy file?
 | 2.0 | IMP-03.1 | Full 45-pattern handoff contracts, edge cases, troubleshooting, composite workflows |
 | 2.1 | 2026-08-10 | Added ai-worklog preflight, state, diagnostics, daily, and closeout contracts |
 | 3.0 | 2026-09-11 | Replaced the 53-pattern matrix with 23 inter-layer rules (R-01..R-23). Corrected the mode/section mapping: structural worklog sections are not mode-gated. Added R-23, fixing the unresolved conflict between the Write Gate's confirmation step and the `.rules` §5 style directive. |
+| 3.1 | 2026-09-11 | Removed the hardcoded JDK 17 requirement. The ceiling is `MAX_JDK` in `syntax_check.sh`, which had already moved to 26 while every document still named 17. |

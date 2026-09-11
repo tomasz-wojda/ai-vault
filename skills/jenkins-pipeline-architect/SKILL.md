@@ -1,6 +1,6 @@
 ---
 name: jenkins-pipeline-architect
-version: "1.0.0"
+version: "1.0.1"
 description: Use this when creating or editing Jenkinsfiles, defining CI/CD stages, or troubleshooting Groovy-based scripted pipelines.
 ---
 
@@ -145,12 +145,12 @@ and shell-in-pipeline rules, read
 
 After every Jenkinsfile creation or edit, run the syntax check before proceeding.
 
-macOS / Linux — use the wrapper, which resolves JDK 17 automatically:
+macOS / Linux — use the wrapper, which resolves a supported JDK automatically:
 ```bash
 <skill-dir>/scripts/syntax_check.sh [files...]
 ```
 
-Windows — invoke the Groovy script directly with `JAVA_HOME` already pointing at JDK 17:
+Windows — invoke the Groovy script directly with `JAVA_HOME` already pointing at a supported JDK:
 ```
 groovy <skill-dir>\scripts\syntax_check.groovy [files...]
 ```
@@ -160,13 +160,19 @@ Usage:
 - With arguments: checks only the specified files; a path that does not resolve is a failure
 - Exit code 0: all files pass. Exit code 1: syntax errors, unreadable paths, or an unusable JDK
 
-JDK requirement: 17 or lower. Groovy 3.x cannot read class files from newer JDKs.
-The wrapper resolves a JDK 17 in this order: `JAVA_HOME` if already 17 or lower,
-then `JAVA_HOME_17`, then `/usr/libexec/java_home -v 17`, then `$JVM_SEARCH_PATH`
-(default `/usr/lib/jvm`). If none is found it exits 1 with the required version named.
+JDK requirement: at or below the ceiling set by `MAX_JDK` in `scripts/syntax_check.sh`.
+Read the value from the script rather than assuming one — it moves as Groovy gains
+support for newer class file formats.
 
-Failure signature `Unsupported class file major version <N>` means the JDK is too new
-for the bundled Groovy. Use the wrapper, or set `JAVA_HOME` to a JDK 17 install.
+The wrapper resolves a JDK in this order: `JAVA_HOME` if it is at or below the
+ceiling, then `JAVA_HOME_17` (a legacy variable name; any version at or below the
+ceiling is accepted), then `/usr/libexec/java_home` on macOS, then
+`$JVM_SEARCH_PATH` (default `/usr/lib/jvm`). If none is found it exits 1 naming
+the required version.
+
+Failure signature `Unsupported class file major version <N>` means the JDK is newer
+than the bundled Groovy can read. Use the wrapper, or point `JAVA_HOME` at a JDK at
+or below the ceiling.
 
 What the check validates:
 - Brace matching (`{` / `}`)

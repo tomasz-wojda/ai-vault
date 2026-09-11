@@ -145,7 +145,7 @@ integrations/<service>/
 | Service | Folder | Credentials | Script | Notes |
 |---------|--------|-------------|--------|-------|
 | JIRA + Tempo | `jira/` | `jira.properties` | `ai-worklog service jira` (8 actions) | Primary ticket interface |
-| New Relic | `newrelic/` | `newrelic.properties` (profile-scoped sections) | `ai-worklog service newrelic` (27 actions) | Monitoring investigations. 19 read actions; `dashboard-export` and the 7 create/update mutations are dry-run unless `--apply` |
+| New Relic | `newrelic/` | `newrelic.properties` (profile-scoped sections) | `ai-worklog service newrelic` (27 actions) | Monitoring investigations. 19 read-only; 8 accept `--apply` and are dry-run without it (`dashboard-export` plus 7 create/update mutations) |
 | AWS | `aws/` | Profile files (export AWS_PROFILE=...) | — | One file per account/role (cue-stage, cue-prod, konto-prod) |
 | EKS | `eks/` | Context files (export KUBECONFIG=... or context name) | — | One file per cluster (konto, cue) |
 | Jenkins | `jenkins/` | `jenkins.properties` or `credentials` | — | Build triggers, job config |

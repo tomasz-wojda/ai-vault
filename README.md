@@ -13,7 +13,7 @@ ai-vault/
 │   │   ├── references/
 │   │   │   └── pipeline-patterns.md
 │   │   └── scripts/
-│   │       ├── syntax_check.sh       <- macOS/Linux entry point, resolves JDK 17
+│   │       ├── syntax_check.sh       <- macOS/Linux entry point, resolves a supported JDK
 │   │       └── syntax_check.groovy
 │   └── jira-worklog-processor/
 │       ├── SKILL.md

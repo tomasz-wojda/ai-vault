@@ -9,7 +9,7 @@ Welcome to **AI Vault**, the single-repo platform for multi-agent workflow autom
 ### Prerequisites
 
 - **Git** (2.x+)
-- **JDK 17** — required by the Jenkins syntax check. JDK 18 and newer break it: Groovy 3.x cannot read their class files.
+- **A JDK** — required by the Jenkins syntax check. There is an upper bound, not a fixed version: Groovy cannot read class files from JDKs newer than it supports. The ceiling is `MAX_JDK` in `skills/jenkins-pipeline-architect/scripts/syntax_check.sh`; the wrapper resolves a suitable install itself.
 - **Groovy 3.x** — for `syntax_check.groovy`
 - **GitHub CLI (`gh`)** — for PR reviews and ticket workflows
 - **ai-worklog-framework 0.2.0+** — executable preflight, state, diagnostics, and reports
@@ -64,7 +64,7 @@ ai-vault/
 │   │   ├── references/
 │   │   │   └── pipeline-patterns.md
 │   │   └── scripts/
-│   │       ├── syntax_check.sh   ← macOS/Linux entry point (resolves JDK 17)
+│   │       ├── syntax_check.sh   ← macOS/Linux entry point (resolves a supported JDK)
 │   │       └── syntax_check.groovy
 │   └── jira-worklog-processor/   ← content generation patterns
 │       ├── SKILL.md              ← worklog structure, FINDINGS/SOLUTIONS format
@@ -237,7 +237,7 @@ directive in `.rules` §5 (see `skills/CROSS_SKILL_INTEGRATION.md` R-23).
 | JIRA reads (`ai-worklog service jira`) | Always | `summary`, `ticket`, `rejected`, `reporter`, `tempo`, `verify`, `whoami` |
 | Tempo log-time dry run | Always | Omit `--apply` |
 | Tempo log-time apply | Write Gate | Add `--apply` only after approval |
-| New Relic operator (`ai-worklog service newrelic`) | Always for reads | 20 read actions; profile keys in `integrations/newrelic/newrelic.properties`; 7 apply-gated writes and `dashboard-export --apply` require Write Gate |
+| New Relic operator (`ai-worklog service newrelic`) | Always for reads | 27 actions: 19 read-only; 8 accept `--apply` and are dry-run without it (`dashboard-export` plus 7 create/update mutations), each requiring a Write Gate. Profile keys in `integrations/newrelic/newrelic.properties` |
 | File reads | Always | No restrictions |
 | kubectl (read-only) | Always | Use patterns from `zzzrecycle/monitor_commands.txt` |
 
