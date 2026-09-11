@@ -118,12 +118,7 @@ Before submitting any contribution:
 
 ### Java/Groovy Files
 
-1. Follow the Write Gate Protocol for any file creation/editing:
-   - ANNOUNCE the operation type
-   - PREVIEW full content (file content, API payload, git command)
-   - WAIT — "Proceed? (yes/no)"
-   - EXECUTE only after user confirms
-   - VERIFY success (re-read file, re-run verify)
+1. Follow the Write Gate Protocol for any file creation or editing. It is specified in `skills/devops-daily-protocol/SKILL.md` § "Write Gate Protocol" and applies to every write in this repository, not only Java and Groovy files.
 2. The agent never commits or pushes. It proposes a semantic commit title and description; the contributor runs the git commands.
 
 ### Jenkins Pipelines

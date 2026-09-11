@@ -220,11 +220,15 @@ When a PR is merged:
 
 ### Write Gate Protocol (All Writes)
 
-1. **ANNOUNCE** the operation type
-2. **PREVIEW** full content (file content, API payload, git command)
-3. **WAIT** — "Proceed? (yes/no)"
-4. **EXECUTE** only after user confirms
-5. **VERIFY** success (re-read file, re-run verify)
+Every non-read operation passes a five-step gate — announce, preview, wait for
+confirmation, execute, verify — before it touches anything. The steps and the
+PREVIEW formats each kind of write must use are specified in
+`skills/devops-daily-protocol/SKILL.md` § "Write Gate Protocol", which owns the
+protocol. Read it before your first write; the summary here is orientation, not
+the contract.
+
+The WAIT step is a safety requirement and is not suspended by the response-style
+directive in `.rules` §5 (see `skills/CROSS_SKILL_INTEGRATION.md` R-23).
 
 ### Read-Only by Default
 
