@@ -22,7 +22,7 @@
     {
       "name": "jira-worklog-processor",
       "dir": "jira-worklog-processor",
-      "required": false,
+      "required": true,
       "ides": ["antigravity", "claude", "cursor"]
     }
   ]
