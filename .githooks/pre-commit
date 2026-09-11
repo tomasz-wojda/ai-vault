@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Blocks a commit unless scripts/validate-skills.sh exits 0.
+# Enable in a fresh clone with: git config core.hooksPath .githooks
+set -u
+
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+cd "${REPO_ROOT}" || exit 0
+
+VALIDATOR="scripts/validate-skills.sh"
+[ -x "${VALIDATOR}" ] || exit 0
+
+# The validator inspects the working tree, not the staged snapshot, so a pass
+# does not describe the commit exactly when tracked files are left dirty.
+DIRTY="$(git diff --name-only --diff-filter=ACMR -- skills '*.md' .rules "${VALIDATOR}")"
+if [ -n "${DIRTY}" ]; then
+    printf 'pre-commit: unstaged changes present; validation covers the working tree:\n'
+    printf '%s\n' "${DIRTY}" | sed 's/^/  /'
+fi
+
+"./${VALIDATOR}"
+STATUS=$?
+
+if [ "${STATUS}" -ne 0 ]; then
+    printf '\npre-commit: commit blocked. Fix the findings above and re-stage.\n'
+fi
+
+exit "${STATUS}"

@@ -19,6 +19,16 @@ Contributions fall into one of four categories:
 
 ## 2. Pre-Commit Checklist
 
+Enable the validation hook once per clone. Without it, the checks below are
+manual and easy to skip:
+
+```
+git config core.hooksPath .githooks
+```
+
+`.githooks/pre-commit` then runs `scripts/validate-skills.sh` on every commit and
+blocks the commit unless it exits 0.
+
 Before submitting any contribution:
 
 ### Protocol Changes (`SKILL.md`)
