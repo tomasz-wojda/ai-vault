@@ -63,7 +63,14 @@ touches `skills/` or `.rules`. It fails when a `SKILL.md` lacks a frontmatter `v
 matching `MAJOR.MINOR.PATCH`, and also checks frontmatter name-to-directory agreement,
 description length, link integrity, code-fence balance, and skill file size.
 
-There is no CI in this repository. The script is the enforcement point.
+There is no CI in this repository. The script is the enforcement point, and each
+clone must enable it: `git config core.hooksPath .githooks` installs it as a
+pre-commit gate.
+
+Know its limit. It validates that a `version` is *present and well-formed*; it
+cannot tell that one failed to *increment*. A skill edited without a bump passes
+every check. That gap is why the bump rule went unhonoured through several
+changes before 2026-09-11.
 
 ## 5. Changelog Placement
 
@@ -71,16 +78,21 @@ Skills do not carry an inline changelog. Version history lives in git. A change 
 a skill's version must state the bump in its commit description, using the semantics in
 § 1.1.
 
-## 6. Current Skill Versions
+## 6. Reading Current Versions
 
-| Skill | Version | Last Updated | Notes |
-|-------|---------|--------------|-------|
-| developer-protocol | 1.0.0 | 2026-07-31 | Canonical mode protocol; `.rules` § 3 delegates here |
-| devops-daily-protocol | 1.1.0 | 2026-08-10 | ai-worklog preflight, state, diagnostics, and delivery integration |
-| jira-worklog-processor | 1.1.0 | 2026-08-10 | Structured-state and diagnostic evidence integration |
-| jenkins-pipeline-architect | 1.0.0 | 2026-07-31 | Core rules in SKILL.md, detail in `references/` |
+This document deliberately does not list them. Each of the three facts such a
+table would carry already has an authoritative home:
 
-Update this table in the same change that bumps a skill's frontmatter version.
+| Fact | Where it lives | How to read it |
+|------|----------------|----------------|
+| Current version | `SKILL.md` frontmatter | `grep -rn '^version:' skills/*/SKILL.md` |
+| When it last changed | git | `git log -1 --format=%ad -- skills/<skill>/SKILL.md` |
+| What the change was | the commit description, per § 5 | `git log --oneline -- skills/<skill>/` |
+
+A table here was a fourth copy, maintained by hand, and it contradicted § 5 —
+which states that skills carry no inline changelog and that version history
+lives in git. It was wrong for every skill it listed and omitted a fifth, so it
+is gone rather than refreshed.
 
 ## Appendix: Versioning Commands
 
@@ -88,9 +100,11 @@ Update this table in the same change that bumps a skill's frontmatter version.
 ./scripts/validate-skills.sh
 
 grep -rn '^version:' skills/*/SKILL.md
+
+git log --oneline -- skills/<skill-name>/
 ```
 
 ---
 
-*Last updated: 2026-07-31*  
+*Last updated: 2026-09-11*  
 *Maintained by: `ai-vault` repository maintainers*
