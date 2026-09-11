@@ -1,6 +1,6 @@
 ---
 name: devops-daily-protocol
-version: "1.1.3"
+version: "1.1.4"
 description: >-
   Orchestrates daily DevOps operations: pulling JIRA tickets, selecting work items,
   creating structured worklog files, integrating ai-worklog and New Relic monitoring,
@@ -104,8 +104,7 @@ Fourteen read actions are always allowed under RESEARCH. Five actions accept
 Gate approval. `policy-delete` additionally requires `--confirm-name` to match.
 
 ### Monitoring References
-- **kubectl patterns**: `zzzrecycle/monitor_commands.txt` — read this file for cluster diagnostic commands
-- **NR host audit**: `zzzrecycle/nr-audit.sh` — remote audit of New Relic config on docker hosts
+- **kubectl patterns**: `integrations/eks/monitor_commands.txt` — read this file for cluster diagnostic commands
 - **Worklog template**: `skills/jira-worklog-processor/worklog.template` — structure for worklog files (managed by sibling skill `jira-worklog-processor`)
 
 ### AI Worklog CLI
@@ -247,7 +246,7 @@ This mode supports the user during active investigation. Use tools as needed:
 - Recent deployments: `ai-worklog service newrelic deployments <APP_ID>`
 - Direct NRQL: `ai-worklog service newrelic nrql "<QUERY>"` or `--file PATH`
 
-**Kubernetes diagnostics** (read `zzzrecycle/monitor_commands.txt` for full list):
+**Kubernetes diagnostics** (read `integrations/eks/monitor_commands.txt` for full list):
 - Prefer a matching read-only pack from `ai-worklog diag list`; run it with `ai-worklog diag run` and reference its evidence bundle in FINDINGS
 - Unhealthy pods: `kubectl get pods --all-namespaces | awk '$4 != "Running" && $4 != "Completed" && NR > 1'`
 - Pod resource usage: `kubectl top pods -n <NAMESPACE> --sort-by=memory`
@@ -431,7 +430,6 @@ TAB 2: <tab description>
 | Check which hosts serve an app | `ai-worklog service newrelic hosts <APP_ID>` |
 | Check recent deployments | `ai-worklog service newrelic deployments <APP_ID>` |
 | Run ad hoc NRQL | `ai-worklog service newrelic nrql "<QUERY>"` |
-| Audit NR config on a remote host | Read `zzzrecycle/nr-audit.sh`, run on target host via SSH |
 
 ### Common NRQL Patterns
 For investigations requiring direct NRQL queries (run via NR UI or API):
@@ -444,7 +442,7 @@ For investigations requiring direct NRQL queries (run via NR UI or API):
 | OTel metric percentage | `SELECT percentage(sum(getField(<metric>, count)), WHERE status_code > 499) FROM Metric WHERE service.name = '<SVC>' SINCE 1 hour ago` |
 
 ### Kubernetes Diagnostics
-Read `zzzrecycle/monitor_commands.txt` for the full command reference. Key commands:
+Read `integrations/eks/monitor_commands.txt` for the full command reference. Key commands:
 | Purpose | Command |
 |---------|---------|
 | Unhealthy pods | `kubectl get pods --all-namespaces \| awk '$4 != "Running" && $4 != "Completed" && NR > 1'` |

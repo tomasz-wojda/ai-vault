@@ -1,6 +1,6 @@
 ---
 name: jira-worklog-processor
-version: "1.1.2"
+version: "1.1.3"
 description: >-
   Process JIRA tickets into structured worklog files following a multi-phase
   research-first workflow. Extends devops-daily-protocol with content generation
@@ -56,7 +56,7 @@ integrations/datadog/                   #   Datadog API keys
 .ai-worklog/config.json                 # Framework workspace configuration
 .ai-worklog/state/<TICKET-KEY>.json     # Machine-readable ticket lifecycle
 .ai-worklog/evidence/                   # Redacted diagnostic evidence
-zzzrecycle/monitor_commands.txt         # kubectl diagnostic patterns
+integrations/eks/monitor_commands.txt         # kubectl diagnostic patterns
 tmp/                                    # Per-ticket scratch artifacts
 prompt.log                              # Session audit trail (append-only)
 ```
@@ -138,7 +138,7 @@ response-style directive in `.rules` §5. See
 | Automox operator | `ai-worklog service automox` | 14 read actions including `profiles`, `orgs`, `groups`, `devices`, `device <ID>`, `device-packages`, `activity`, `patch-summary`, `policies`, `policy`, `policy-stats`, `device-queue`; `policy-run`, `worklet-create`, `policy-delete`, `device-move` and `policy-add-group` require Write Gate and `--apply` |
 | AI Worklog | `ai-worklog` on PATH | `preflight`, `ticket prepare`, `state`, `diag`, `delivery`, `closeout` |
 | Worklog template | [worklog.template](worklog.template) | Section scaffold (ships with this skill) |
-| kubectl patterns | `zzzrecycle/monitor_commands.txt` | Cluster diagnostics |
+| kubectl patterns | `integrations/eks/monitor_commands.txt` | Cluster diagnostics |
 
 ## Phase 1: Ticket Pickup
 

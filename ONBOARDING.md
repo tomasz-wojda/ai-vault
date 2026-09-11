@@ -13,7 +13,7 @@ Welcome to **AI Vault**, the single-repo platform for multi-agent workflow autom
 - **Groovy 3.x** — for `syntax_check.groovy`
 - **GitHub CLI (`gh`)** — for PR reviews and ticket workflows
 - **ai-worklog-framework 0.13.0+** — executable preflight, state, diagnostics, and reports. The `service` namespace the skills call arrived on 2026-09-09; earlier builds have no `service` command at all. Confirm with `ai-worklog --version`, which also prints the Groovy and Java versions in use
-- **Groovy runtime selected in `ai-worklog`** — the `service` operators (`jira`, `jenkins`, `newrelic`) exist only there; the Python runtime rejects `service` outright. Check with `ai-worklog config runtime`, set with `ai-worklog config runtime groovy`. It defaults to `groovy` when `~/.ai-worklog/config.json` is absent, so this usually needs no action
+- **Groovy runtime selected in `ai-worklog`** — the `service` operators (`jira`, `jenkins`, `newrelic`, `automox`) exist only there; the Python runtime rejects `service` outright. Check with `ai-worklog config runtime`, set with `ai-worklog config runtime groovy`. It defaults to `groovy` when `~/.ai-worklog/config.json` is absent, so this usually needs no action
 
 ### First Steps
 
@@ -34,8 +34,9 @@ export PATH="$(cd ../ai-worklog-framework && pwd)/bin:$PATH"
 ```
 
 Claude Code reads the same `SKILL.md` frontmatter, so one symlink is all it needs.
-It does not read `.rules` — its equivalent is `CLAUDE.md`, which this repo does not
-ship; under Claude Code the mode protocol comes from the `developer-protocol` skill.
+It does not read `.rules` directly — its equivalent is `CLAUDE.md`, which this repo
+does ship at the root, importing `.rules` via `@.rules` and restating the
+directives whose failure causes damage.
 
 Initialize or reconcile a workspace with:
 ```
@@ -119,8 +120,8 @@ When multiple skills are active, `devops-daily-protocol` governs *when* and *how
 After initial setup, your workspace should look like:
 
 The repository holds only skills, rules, and tooling. The `worklog/`, `tmp/`,
-`zzzrecycle/`, and `prompt.log` paths below live in your working workspace, not in
-this repository, and are excluded by `.gitignore`.
+`integrations/`, and `prompt.log` paths below live in your working workspace, not
+in this repository, and are excluded by `.gitignore`.
 
 ```
 ai-vault/
@@ -159,7 +160,7 @@ ai-vault/
 │   ├── newrelic/newrelic.properties ← NR API keys (NEVER commit)
 │   ├── aws/                        ← AWS profile files per account
 │   └── eks/                        ← EKS context files per cluster
-├── zzzrecycle/monitor_commands.txt ← kubectl diagnostic patterns
+│       └── monitor_commands.txt    ← kubectl diagnostic patterns
 ├── prompt.log                      ← session audit trail (append-only)
 └── tmp/                            ← scratch artifacts (per-ticket folders)
 ```
@@ -241,7 +242,7 @@ directive in `.rules` §5 (see `skills/CROSS_SKILL_INTEGRATION.md` R-23).
 | New Relic operator (`ai-worklog service newrelic`) | Always for reads | 27 actions: 19 read-only; 8 accept `--apply` and are dry-run without it (`dashboard-export` plus 7 create/update mutations), each requiring a Write Gate. Profile keys in `integrations/newrelic/newrelic.properties` |
 | Automox operator (`ai-worklog service automox`) | Always for reads | 19 actions: 14 read-only; 5 accept `--apply` and are dry-run without it (`policy-run`, `worklet-create`, `policy-delete`, `device-move`, `policy-add-group`), each requiring a Write Gate. Profile keys in `integrations/automox/automox.properties` |
 | File reads | Always | No restrictions |
-| kubectl (read-only) | Always | Use patterns from `zzzrecycle/monitor_commands.txt` |
+| kubectl (read-only) | Always | Use patterns from `integrations/eks/monitor_commands.txt` |
 
 ### Never Commit
 
