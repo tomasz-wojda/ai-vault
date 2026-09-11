@@ -43,7 +43,7 @@ Agent hosts read the skills through symlinks created outside this repository
 ├─────────────────────────────────────────────────┤
 │  devops-daily-protocol                          │
 │  Lifecycle: preflight, pickup, delivery, done   │
-│  Tools: ai-worklog, JIRA/NR CLI, Tempo API      │
+│  Tools: ai-worklog, service jira / newrelic     │
 ├─────────────────────────────────────────────────┤
 │  jira-worklog-processor                         │
 │  Content: FINDINGS patterns, solution options,  │

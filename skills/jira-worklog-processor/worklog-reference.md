@@ -25,7 +25,7 @@ worklog/
     ├── aws/                            #   AWS profiles (export AWS_PROFILE=...)
     ├── eks/                            #   EKS contexts (export KUBECONFIG=...)
     ├── jira/                           #   JIRA CLI + credentials
-    ├── newrelic/                       #   NR CLI + credentials
+    ├── newrelic/                       #   newrelic.properties (profile-scoped)
     ├── jenkins/                        #   Jenkins credentials
     ├── github/                         #   GitHub tokens
     ├── argocd/                         #   Argo CD credentials
@@ -145,7 +145,7 @@ integrations/<service>/
 | Service | Folder | Credentials | Script | Notes |
 |---------|--------|-------------|--------|-------|
 | JIRA + Tempo | `jira/` | `jira.properties` | `ai-worklog service jira` (8 actions) | Primary ticket interface |
-| New Relic | `newrelic/` | `newrelic.properties` or `credentials` | `newrelic-info.sh` (6 modes: apps, app, hosts, deployments, alerts, violations) | Monitoring investigations |
+| New Relic | `newrelic/` | `newrelic.properties` (profile-scoped sections) | `ai-worklog service newrelic` (27 actions) | Monitoring investigations. 19 read actions; `dashboard-export` and the 7 create/update mutations are dry-run unless `--apply` |
 | AWS | `aws/` | Profile files (export AWS_PROFILE=...) | — | One file per account/role (cue-stage, cue-prod, konto-prod) |
 | EKS | `eks/` | Context files (export KUBECONFIG=... or context name) | — | One file per cluster (konto, cue) |
 | Jenkins | `jenkins/` | `jenkins.properties` or `credentials` | — | Build triggers, job config |
@@ -666,7 +666,7 @@ repos/ai-vault/
 ├─────────────────────────────────────────────────┤
 │  devops-daily-protocol (ai-vault)               │
 │  Lifecycle: pickup, investigation, done, verify │
-│  Tools: JIRA CLI, NR CLI, Tempo API             │
+│  Tools: ai-worklog service jira / newrelic      │
 │  Safety: Write Gate, prompt.log                 │
 ├─────────────────────────────────────────────────┤
 │  developer-protocol (ai-vault)                  │
