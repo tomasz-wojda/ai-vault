@@ -24,6 +24,12 @@
       "dir": "jira-worklog-processor",
       "required": true,
       "ides": ["antigravity", "claude", "cursor"]
+    },
+    {
+      "name": "pr-review-comments",
+      "dir": "pr-review-comments",
+      "required": false,
+      "ides": ["antigravity", "claude", "cursor"]
     }
   ]
 }
