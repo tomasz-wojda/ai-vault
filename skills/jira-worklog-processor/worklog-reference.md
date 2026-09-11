@@ -567,20 +567,20 @@ HOSTNAME="${1:?usage: verify.sh <hostname>}"
 
 ### PR.log
 
-`PR.log` lives at the workspace root. Each entry is a self-contained PR review record
-separated by `================================================================================`.
+`PR.log` lives at the workspace root, is gitignored, and is append-only. Each
+entry is a self-contained PR review record.
 
-Entry structure:
+The entry structure is specified once, in [SKILL.md](SKILL.md) § "PR.log Entry
+Format" — which sections are required, which are conditional on a worklog
+resolving, which are free to name per PR, and which blocks `pr-review-comments`
+appends after posting. Do not restate it here.
 
-| Section | Content |
-|---------|---------|
-| Header | `--- YYYY-MM-DDTHH:MM ---` timestamp + `PR #N \| org/repo` + URL |
-| METADATA | Title, author, branch, created, state, labels, CI, reviews, requested reviewers |
-| CHANGED FILES | Count + per-file summary with change type and description |
-| REFERENCED MODULE | External dependency details — tags, changelogs, related PRs (when applicable) |
-| WORKLOG CROSS-REFERENCE | Ticket key, worklog path, checklist coverage ([~] in PR / [ ] missing), out-of-scope changes |
-| SCALING COMPARISON | Before/after metrics (when PR changes resource configs) |
-| OBSERVATIONS | Numbered analysis: risks, missing items, patterns, recommendations |
+Two properties are easy to get wrong:
+
+- The trailing `=` rule is a visual aid, not a delimiter. Not every entry has
+  one, so **split on the `--- YYYY-MM-DDTHH:MM ---` header** when parsing.
+- `OBSERVATIONS` closes the analysis. Blocks after it record what was posted,
+  not what was found.
 
 ### PR.log ↔ Worklog Cross-Reference
 

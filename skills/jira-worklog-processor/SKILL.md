@@ -1,6 +1,6 @@
 ---
 name: jira-worklog-processor
-version: "1.1.4"
+version: "1.1.5"
 description: >-
   Process JIRA tickets into structured worklog files following a multi-phase
   research-first workflow. Extends devops-daily-protocol with content generation
@@ -328,6 +328,11 @@ Triggered when user says "PR #N merged", or when `gh pr view` shows `state: MERG
 
 ### PR.log Entry Format
 
+An entry has a fixed head, a fixed tail, and a freely composed middle. Only the
+head, `METADATA` and `OBSERVATIONS` appear in every entry.
+
+**Required — every entry:**
+
 ```
 --- YYYY-MM-DDTHH:MM ---
 PR #N | org/repo
@@ -348,20 +353,62 @@ CHANGED FILES (N files, +X/-Y):
   1. path/to/file [MODIFIED|ADDED|DELETED]
      - Description of change
 
-WORKLOG CROSS-REFERENCE: <TICKET-KEY>
-  Worklog: worklog/YYYY-MM-DD_<TICKET-KEY>.log
-  Checklist coverage:
-    [~] Step N — covered by file.ext changes (PR open)
-    [~] Step M — covered by file2.ext changes (PR open)
-    [ ] Step K — NOT in this PR (still pending)
-  Out-of-scope changes:
-    - file3.ext — not mentioned in worklog plan
-
 OBSERVATIONS:
   1. Numbered observations about the PR
   2. Risk flags, missing tests, config concerns
   3. Comparison to worklog PROPOSED SOLUTIONS
+```
 
+`OBSERVATIONS` is always last of the analysis sections. Anything appended after
+it is a record of action taken, not analysis.
+
+**Conditional — when a ticket key resolves to a worklog.** Place before
+`OBSERVATIONS`. Omit per "Review Without Worklog" below when none is found:
+
+```
+WORKLOG CROSS-REFERENCE: <TICKET-KEY>
+  Worklog: worklog/YYYY-MM-DD_<TICKET-KEY>.log
+  Checklist coverage:
+    [~] Step N — covered by file.ext changes (PR open)
+    [ ] Step K — NOT in this PR (still pending)
+  Out-of-scope changes:
+    - file3.ext — not mentioned in worklog plan
+```
+
+**Optional — named context sections.** Between `CHANGED FILES` and
+`OBSERVATIONS`, add as many upper-case sections as the PR warrants, named for
+what they hold. Existing entries use `CONTEXT`, `SCOPE`, `CHANGES`,
+`REFERENCES`, `JOB CONTEXT`, `BREAKING CHANGES`, `COMMIT HISTORY`,
+`CI FAILURES`, `REFERENCED MODULE` (external dependency tags and changelogs) and
+`SCALING COMPARISON` (before/after metrics when resource configs change), among
+others. This is deliberate: a Helm chart bump and a Jenkinsfile
+refactor do not summarise the same way. Do not invent a section that duplicates
+`OBSERVATIONS`.
+
+**Appended by `pr-review-comments`** when findings were posted to GitHub. That
+skill owns the content of these blocks; this document fixes only their position,
+which is after `OBSERVATIONS`:
+
+```
+POSTED COMMENTS:
+  1. <severity> — <one-line verdict>
+     <path>:<line or start-end>
+     https://github.com/<org>/<repo>/pull/<N>#discussion_r<id>
+     Suggestion: yes|no   From: OBSERVATION <n>
+
+NOT POSTED (kept in chat):
+  - <finding> — <which evidence bar it failed>
+
+POSTED COMMENTS FOLLOW-UP (YYYY-MM-DDTHH:MM):
+  1. r<id> — suggestion applied in <sha>
+  2. r<id> — still open at merge
+```
+
+**Separator.** End an entry with an 80-character `=` rule. It is a visual aid,
+not a delimiter — some entries lack it, so **parse by splitting on the
+`--- YYYY-MM-DDTHH:MM ---` header, never on the rule.**
+
+```
 ================================================================================
 ```
 
