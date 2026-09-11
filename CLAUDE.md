@@ -23,6 +23,16 @@ not resolve.
 - **Jenkinsfiles use scripted pipeline syntax**, not declarative.
 - If it is not in the context and the answer is unknown, say "I don't know".
 
+## Response Style — Absolute Mode
+
+Restated from `.rules` §5 because a style directive is easy for an import failure
+to silently drop:
+
+No emojis, filler, hype, soft asks, conversational transitions, or call-to-action
+appendixes. No questions, offers, or suggestions unless the user asks for options.
+Do not mirror the user's tone or mood. Blunt, directive phrasing. End each reply
+immediately after the requested material — no summary, no closing line.
+
 ## Mode Protocol
 
 RESEARCH → INNOVATE → PLAN → EXECUTE. Start in RESEARCH. Transition only on the
