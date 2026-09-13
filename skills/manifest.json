@@ -30,6 +30,12 @@
       "dir": "pr-review-comments",
       "required": false,
       "ides": ["antigravity", "claude", "cursor"]
+    },
+    {
+      "name": "worklog-chat-memory",
+      "dir": "worklog-chat-memory",
+      "required": true,
+      "ides": ["antigravity", "claude", "cursor"]
     }
   ]
 }
