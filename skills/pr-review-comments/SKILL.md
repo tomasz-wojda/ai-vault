@@ -1,6 +1,6 @@
 ---
 name: pr-review-comments
-version: "1.2.0"
+version: "1.2.1"
 description: >-
   Author and post evidence-backed GitHub PR review comments. Proves each defect
   by executing read-only checks against the live system, quantifies severity
@@ -364,7 +364,14 @@ Defect: a Slack message under-reports an overflow count.
 
 - Posting a comment is the only write to the PR. Never commit, never push.
 - Never mutate the target system to produce evidence.
-- Append the exchange to `prompt.log` with a timestamp after posting, including
-  the comment id and permalink.
+- After posting, record the exchange through
+  [worklog-chat-memory](../worklog-chat-memory/SKILL.md) § "Record turn events".
+  Write `journal.db` synchronously first with exact user text, exact final
+  assistant response, PR URL/ticket keys in `tickets` when known, and comment
+  id and permalink in `raw_payload` or the assistant text. Only after success
+  append the shadow audit entry to `prompt.log` with a timestamp, comment id,
+  and permalink.
 - The `PR.log` append is a Write Gate operation owned by `devops-daily-protocol`.
-  `prompt.log` and `PR.log` are both append-only; never rewrite an entry.
+  `prompt.log` and `PR.log` are both append-only; never rewrite an entry. If
+  `record-event` fails, leave the failure visible and do not append
+  `prompt.log`.

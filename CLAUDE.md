@@ -13,8 +13,15 @@ not resolve.
 
 - **Never commit or push.** After changes are applied, provide a semantic commit
   title and description. The user runs the git commands.
-- **`prompt.log` is append-only.** Never overwrite it. Create it only if absent.
-  Append a summary after every interaction.
+- **Journal capture is rule-driven, not hook-driven.** Do not configure Claude
+  user or project hooks for turn capture; organization policy blocks them.
+  After every response, write the turn to `journal.db` first through
+  `ai-memory-ingester record-event` with JSON on stdin per
+  `skills/worklog-chat-memory/references/journal-writer-contract.json`, using
+  exact user text and exact final assistant response text. Only after a
+  successful write append the same current `prompt.log` audit entry. If
+  `record-event` fails, leave the failure visible and do not append
+  `prompt.log`. Never overwrite `prompt.log`; create it only if absent.
 - **Read before Write.** The Write tool overwrites; it does not append. If a file
   exists, read it and merge.
 - **No unsolicited documentation or code comments.** Only when explicitly asked.

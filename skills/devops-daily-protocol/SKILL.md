@@ -1,6 +1,6 @@
 ---
 name: devops-daily-protocol
-version: "1.1.5"
+version: "1.1.6"
 description: >-
   Orchestrates daily DevOps operations: pulling JIRA tickets, selecting work items,
   creating structured worklog files, integrating ai-worklog and New Relic monitoring,
@@ -27,7 +27,9 @@ Read operations (always allowed without approval):
 - Running kubectl read-only commands (get, describe, top, logs)
 - Running `ai-worklog` preflight, prepare, report, catalog, diagnostic, and toolchain reads
 
-After every interaction, append a summary to `prompt.log` (see Prompt Logging section).
+After every interaction, record the turn through the governed
+`worklog-chat-memory` journal writer and shadow `prompt.log` append (see Prompt
+Logging section).
 
 ## Available Tools
 All paths are relative to the workspace root. `integrations/` is the canonical
@@ -422,17 +424,25 @@ All worklog files follow the `skills/jira-worklog-processor/worklog.template` st
 The file `worklog/tickets.log` stores the latest output from `ai-worklog service jira summary`. Overwrite it each time summary is run at day start.
 
 ## Prompt Logging
-After every interaction, append to `prompt.log` at the workspace root:
+
+After every interaction, follow
+[worklog-chat-memory](../worklog-chat-memory/SKILL.md) § "Record turn events".
+Write `journal.db` synchronously first with exact user text and exact final
+assistant response through `ai-memory-ingester record-event` and JSON on stdin.
+Only after success append the shadow audit entry to `prompt.log` at the
+workspace root:
+
 ```
 --- PROMPT LOG ENTRY ---
 TIMESTAMP: YYYY-MM-DD
-USER: <concise summary of what the user asked>
-ASSISTANT: <mode used> — <concise summary of actions taken and outcomes>
-  <key details: files created, commands run, time logged, etc.>
+USER: <exact user prompt or concise summary when verbatim capture is unavailable>
+ASSISTANT: <mode used> — <exact final assistant response or concise outcome>
+  <key details: files created, commands run, time logged, ticket keys, etc.>
 --- END PROMPT LOG ENTRY ---
 ```
 
 For multi-tab sessions, use sub-sections:
+
 ```
 --- PROMPT LOG ENTRY ---
 TIMESTAMP: YYYY-MM-DD
@@ -445,6 +455,9 @@ TAB 2: <tab description>
   <details>
 --- END PROMPT LOG ENTRY ---
 ```
+
+If `record-event` fails, leave the failure visible and do not append
+`prompt.log`.
 
 ## New Relic Integration
 ### Investigation Decision Tree

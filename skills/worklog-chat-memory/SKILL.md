@@ -1,12 +1,13 @@
 ---
 name: worklog-chat-memory
-version: "1.1.0"
+version: "1.2.0"
 description: >-
-  Retrieves and maintains workspace conversation memory from materialized
-  prompt-log turns and tiered SQLite indexes. Use when resuming prior work,
-  recalling ticket decisions, searching past prompts and responses, inspecting
-  artifacts, performing forensic dross searches, or synchronizing prompt.log
-  through the ai-memory-ingester workflow.
+  Retrieves and maintains workspace conversation memory from the immutable
+  SQLite journal, materialized turns, and tiered SQLite indexes. Use when
+  resuming prior work, recalling ticket decisions, searching past prompts and
+  responses, recording turn events, inspecting artifacts, performing forensic
+  dross searches, or synchronizing memory through the ai-memory-ingester
+  workflow.
 ---
 
 # Worklog Chat Memory
@@ -44,27 +45,18 @@ SQL
 ## Search memory
 
 Search `convo.db`, `worklogs.db`, and `artifacts.db` by default. Search
-`dross.db` only for forensic or audit requests. Set the FTS expression as a
-bound parameter.
+`dross.db` only for forensic or audit requests. Use the common retrieval
+command so every IDE receives the same body relevance, recency, authority,
+freshness, impact, and neighbor ranking.
 
 ```bash
-sqlite3 -json "${MEMORY_DATA}/convo.db" <<'SQL'
-PRAGMA trusted_schema=ON;
-.parameter init
-.parameter set @query 'deployment'
-SELECT d.id, d.source_archive, d.file_path, d.file_name, d.extension,
-       bm25(documents_fts) AS rank, substr(d.content, 1, 2000) AS snippet
-FROM documents_fts
-JOIN documents d ON d.id = documents_fts.rowid
-WHERE documents_fts MATCH @query
-ORDER BY rank
-LIMIT 10;
-SQL
+cd "${MEMORY_REPO}"
+./ai-memory-ingester query "deployment" --dataset worklog-chat --limit 10 --signals
 ```
 
-Repeat the bound query against `artifacts.db` when factual dumps may contain
-the answer. Repeat it against `dross.db` only when the default tiers return
-nothing or the request is forensic.
+Use `--dataset worklog-chat-all` only when the request is forensic or the
+default tiers return nothing. Use `--db` only for explicit legacy-compatible
+single-database inspection.
 
 ## Retrieve a ticket
 
@@ -162,6 +154,72 @@ under `worklog-chat/worklogs`, ticket capsules under
 `worklog-chat/ticket-state`, artifacts under `worklog-chat/artifacts`, and
 dross under `worklog-chat/dross`.
 
+## Record turn events
+
+During the shadow period every IDE uses the same JSON-on-stdin writer.
+Authoritative capture is synchronous `journal.db` first; only after a
+successful `record-event` append the current `prompt.log` audit entry. If
+`record-event` fails, leave the failure visible and do not append
+`prompt.log`.
+
+Contract: [references/journal-writer-contract.json](references/journal-writer-contract.json).
+Schema version `1` matches `ai-memory-ingester record-event`.
+
+Required payload fields:
+
+| Field | Requirement |
+| --- | --- |
+| `schema_version` | `1` |
+| `source_ide` | `cursor`, `claude`, or `antigravity` |
+| `source_kind` | `rule_write` for governed rule capture |
+| `source_identity` | Stable source label, typically `prompt.log` |
+| `user_text` | Exact user prompt text |
+| `assistant_text` | Exact final assistant response text |
+
+When available also supply `session_id`, `prompt_id`, `mode`, `tickets`,
+`impact`, `event_time`, `event_time_confidence`, and `raw_payload`. Never
+pass conversational payload through shell arguments; write JSON to a temporary
+file or pipe it on stdin.
+
+```bash
+: "${MEMORY_WORKSPACE_ROOT:?Set MEMORY_WORKSPACE_ROOT}"
+MEMORY_REPO="${MEMORY_WORKSPACE_ROOT}/repos/ai-memory-ingester"
+PAYLOAD="$(mktemp)"
+trap 'rm -f "${PAYLOAD}"' EXIT
+cat >"${PAYLOAD}" <<'JSON'
+{
+  "schema_version": 1,
+  "source_ide": "cursor",
+  "source_kind": "rule_write",
+  "source_fidelity": "rule_write",
+  "source_identity": "prompt.log",
+  "session_id": "promptlog:2026-09-14",
+  "prompt_id": "turn-example",
+  "user_text": "<exact user prompt>",
+  "assistant_text": "<exact final assistant response>",
+  "outcome_summary": "<optional short outcome>",
+  "mode": "execute",
+  "tickets": ["DEVOPS-1"],
+  "impact": "high",
+  "event_time": "2026-09-14T16:00:00Z",
+  "event_time_confidence": "exact",
+  "raw_payload": "USER:\n<exact user prompt>\n\nASSISTANT:\n<exact final assistant response>"
+}
+JSON
+cd "${MEMORY_REPO}"
+if ./ai-memory-ingester record-event <"${PAYLOAD}"; then
+  printf '%s\n' "--- PROMPT LOG ENTRY ---" >> "${MEMORY_WORKSPACE_ROOT}/prompt.log"
+  printf '%s\n' "TIMESTAMP: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "${MEMORY_WORKSPACE_ROOT}/prompt.log"
+  printf '%s\n' "USER: <exact user prompt>" >> "${MEMORY_WORKSPACE_ROOT}/prompt.log"
+  printf '%s\n' "ASSISTANT: <mode> — <exact final assistant response>" >> "${MEMORY_WORKSPACE_ROOT}/prompt.log"
+  printf '%s\n' "--- END PROMPT LOG ENTRY ---" >> "${MEMORY_WORKSPACE_ROOT}/prompt.log"
+fi
+```
+
+Claude Code and AntiGravity use the same contract and command with their
+`source_ide` value. Do not rely on Claude user or project hooks for capture;
+organization policy blocks them and rules remain the portable adapter.
+
 ## Synchronize memory
 
 Run the unified sweep at session start:
@@ -172,5 +230,5 @@ cd "${MEMORY_REPO}"
 ```
 
 Supply journal or stream content through standard input or a temporary file.
-Never place content in an interpolated command argument. Append to
-`prompt.log`; never overwrite or insert into existing content.
+Never place content in an interpolated command argument. During rollback the
+legacy `prompt.log`-only path remains accepted until journal parity gates pass.

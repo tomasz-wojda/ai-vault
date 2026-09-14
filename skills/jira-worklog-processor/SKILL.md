@@ -1,6 +1,6 @@
 ---
 name: jira-worklog-processor
-version: "1.1.5"
+version: "1.1.6"
 description: >-
   Process JIRA tickets into structured worklog files following a multi-phase
   research-first workflow. Extends devops-daily-protocol with content generation
@@ -58,7 +58,8 @@ integrations/datadog/                   #   Datadog API keys
 .ai-worklog/evidence/                   # Redacted diagnostic evidence
 integrations/eks/monitor_commands.txt    # kubectl diagnostic patterns
 tmp/                                    # Per-ticket scratch artifacts
-prompt.log                              # Session audit trail (append-only)
+repos/ai-memory-ingester/data/journal.db # Authoritative turn journal (SQLite)
+prompt.log                              # Shadow audit trail during rollback (append-only)
 ```
 
 Credential files are never committed and never read for their values. If
@@ -450,16 +451,24 @@ When a ticket relates to another:
 
 ## Prompt Logging
 
-After every interaction, append to `prompt.log` at workspace root:
+After every interaction, follow
+[worklog-chat-memory](../worklog-chat-memory/SKILL.md) § "Record turn events".
+Include active ticket keys in the JSON `tickets` array when known. Write
+`journal.db` synchronously first with exact user text and exact final assistant
+response. Only after success append the shadow audit entry to `prompt.log` at
+workspace root:
 
 ```
 --- PROMPT LOG ENTRY ---
 TIMESTAMP: YYYY-MM-DD
-USER: <concise summary>
-ASSISTANT: <mode> — <actions taken and outcomes>
-  <files created, commands run, key details>
+USER: <exact user prompt or concise summary>
+ASSISTANT: <mode> — <exact final assistant response or concise outcome>
+  <files created, commands run, ticket keys, key details>
 --- END PROMPT LOG ENTRY ---
 ```
+
+If `record-event` fails, leave the failure visible and do not append
+`prompt.log`.
 
 ## Mode Discipline
 
