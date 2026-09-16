@@ -32,6 +32,12 @@
       "ides": ["antigravity", "claude", "cursor"]
     },
     {
+      "name": "creating-presentation-decks",
+      "dir": "creating-presentation-decks",
+      "required": false,
+      "ides": ["antigravity", "claude", "cursor"]
+    },
+    {
       "name": "worklog-chat-memory",
       "dir": "worklog-chat-memory",
       "required": true,

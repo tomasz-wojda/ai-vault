@@ -1,0 +1,35 @@
+{
+  "identity": {
+    "title": "Presentation Topic",
+    "presenter": "Name Surname",
+    "team": "@team",
+    "pdf_author": "Name Surname"
+  },
+  "page": {
+    "width": 960.0,
+    "height": 540.0
+  },
+  "layout": {
+    "card_margin": 30.0,
+    "card_radius": 34.0,
+    "card_padding": 44.0,
+    "grid_step": 30.0,
+    "logo_height": 40.0
+  },
+  "colors": {
+    "canvas_background": "#f2f2f2",
+    "grid_line": "#e7e7e7",
+    "card_background": "#faf7ef",
+    "card_edge": "#1a1a1a",
+    "accent": "#1a1a8c",
+    "rule": "#d6d1c4",
+    "footer": "#5a564e"
+  },
+  "fonts": {
+    "regular_path": null,
+    "bold_path": null
+  },
+  "assets": {
+    "logo_path": null
+  }
+}
