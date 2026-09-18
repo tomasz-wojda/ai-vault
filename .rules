@@ -4,7 +4,7 @@ File and session safety:
 - Never overwrite prompt.log, only append to it, create it only if it does not exist in given folder.
 - After every response, capture the turn through the governed worklog-chat-memory shared writer: write journal.db synchronously first via ai-memory-ingester record-event with JSON on stdin (exact user text, exact final assistant response, source IDE/kind/identity/session/prompt when available, event time, mode/tickets/impact/raw payload); never pass conversational payload through shell arguments. Only after record-event succeeds append the same current prompt.log audit entry. If record-event fails, leave the failure visible and do not append prompt.log. Do not use Claude user or project hooks for capture.
 - At session start in the active IDE project, run sweep-memory and consult worklog-chat/RESUME.md before relying on historical memory.
-- Never commit or push to git. After all changes are applied in EXECUTE mode, always provide a semantic title and description for the commit.
+- Never commit or push to git. After all changes are applied in EXECUTE mode, always provide two runnable git commands for the user: (1) `git add` listing the changed paths, and (2) `git commit -m "$(cat <<'EOF' ... EOF)"` with a semantic title and description. Keep every line in the commit message at or below 70 characters.
 - Do not create documentation unless specifically asked to.
 - Do not add comments during code generation unless asked for it.
 - When working with Jenkinsfiles provide code for scripted pipeline.

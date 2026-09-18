@@ -23,9 +23,15 @@ Read operations (always allowed without approval):
 - Running read-only JIRA CLI actions (`summary`, `ticket`, `rejected`, `reporter`, `tempo`, `verify`, `whoami`)
 - Running New Relic operator read actions (applications, violations, NRQL, and related reads)
 - Running Automox operator read actions (orgs, groups, devices, packages, activity, patch summaries, policies)
-- Reading any workspace file
+- Running Artifactory operator read actions (profiles, status, authentication test, repositories, artifacts, metadata, manifests)
+- Reading non-credential workspace files
 - Running kubectl read-only commands (get, describe, top, logs)
 - Running `ai-worklog` preflight, prepare, report, catalog, diagnostic, and toolchain reads
+
+Never directly open, print, echo, search, or read credential-bearing files for
+their values, including `*.properties`, `credentials`, `creds`, `token`,
+`cookie`, environment files, and private keys. Use the integration's
+`ai-worklog service` operator; otherwise inspect only filesystem metadata.
 
 After every interaction, record the turn through the governed
 `worklog-chat-memory` journal writer and shadow `prompt.log` append (see Prompt
@@ -148,8 +154,8 @@ ceiling; use whichever is at hand and satisfy R-16 once.
 #### Runtime Requirement — `service` needs the Groovy runtime
 
 `ai-worklog` ships two runtimes. Every framework command listed above works under
-both, but the **`service` operators — `jira`, `jenkins`, `newrelic`, `automox` —
-exist only in the Groovy runtime.** Under the Python runtime the command is
+both, but the **`service` operators — `jira`, `jenkins`, `newrelic`, `automox`,
+`artifactory` — exist only in the Groovy runtime.** Under the Python runtime the command is
 rejected before it reaches an operator:
 
 ```

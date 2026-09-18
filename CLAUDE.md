@@ -11,8 +11,10 @@ not resolve.
 
 ## Non-negotiables
 
-- **Never commit or push.** After changes are applied, provide a semantic commit
-  title and description. The user runs the git commands.
+- **Never commit or push.** After changes are applied, provide two git commands
+  the user runs: `git add …` and `git commit -m "$(cat <<'EOF' … EOF)"` with a
+  semantic title and description. Keep each commit-message line at or below
+  70 characters.
 - **Journal capture is rule-driven, not hook-driven.** Do not configure Claude
   user or project hooks for turn capture; organization policy blocks them.
   After every response, write the turn to `journal.db` first through

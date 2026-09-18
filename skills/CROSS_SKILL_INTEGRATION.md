@@ -106,7 +106,7 @@ wins when two of them collide.
 
 ### 2.7 Runtime Precondition
 
-- **R-24** The `ai-worklog service` operators — `jira`, `jenkins`, `newrelic`, `automox` — exist only in the Groovy runtime. Under the Python runtime the command is rejected before reaching an operator, with `invalid choice: 'service'`, which removes every L2 tool contract at once. Every other framework command (R-18 to R-22) works under both runtimes. The runtime resolves from `--runtime`, then `AI_WORKLOG_RUNTIME`, then the `runtime` key in `~/.ai-worklog/config.json`, defaulting to `groovy` when no config file exists. Verify with `ai-worklog config runtime` before relying on any tool contract.
+- **R-24** The `ai-worklog service` operators — `jira`, `jenkins`, `newrelic`, `automox`, `artifactory` — exist only in the Groovy runtime. Under the Python runtime the command is rejected before reaching an operator, with `invalid choice: 'service'`, which removes every L2 tool contract at once. Every other framework command (R-18 to R-22) works under both runtimes. The runtime resolves from `--runtime`, then `AI_WORKLOG_RUNTIME`, then the `runtime` key in `~/.ai-worklog/config.json`, defaulting to `groovy` when no config file exists. Verify with `ai-worklog config runtime` before relying on any tool contract.
 
 ### 2.8 PR Comment Authoring — owner `pr-review-comments`
 

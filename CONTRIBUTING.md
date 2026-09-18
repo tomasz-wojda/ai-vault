@@ -119,7 +119,7 @@ Before submitting any contribution:
 ### Java/Groovy Files
 
 1. Follow the Write Gate Protocol for any file creation or editing. It is specified in `skills/devops-daily-protocol/SKILL.md` § "Write Gate Protocol" and applies to every write in this repository, not only Java and Groovy files.
-2. The agent never commits or pushes. It proposes a semantic commit title and description; the contributor runs the git commands.
+2. The agent never commits or pushes. It provides two git commands for the contributor to run: `git add …` and `git commit -m "$(cat <<'EOF' … EOF)"` with a semantic title and description. Each commit-message line must stay at or below 70 characters.
 
 ### Jenkins Pipelines
 
@@ -209,30 +209,48 @@ Include in your issue:
 
 ## 9. Commit Message Conventions
 
-```
+The agent never runs git. After changes it provides two commands:
+
+```bash
+git add path/to/changed-file ...
+git commit -m "$(cat <<'EOF'
 feat: description of change
 
 Detailed explanation of the change and its impact.
 
 Related ticket: KD-1234
+EOF
+)"
 ```
+
+Keep every line in the commit message at or below 70 characters.
 
 ### Example Commit Messages
 
-```
+```bash
+git add skills/devops-daily-protocol/SKILL.md worklog.template
+git commit -m "$(cat <<'EOF'
 feat: add deployment verification mode to devops-daily-protocol
+
 Update SKILL.md with new Deployment Verification workflow mode.
 Add corresponding section to worklog.template.
 
 Related ticket: DEVOPS-9999
+EOF
+)"
 ```
 
-```
+```bash
+git add skills/jira-worklog-processor/SKILL.md
+git commit -m "$(cat <<'EOF'
 docs: update PR review format in jira-worklog-processor/SKILL.md
+
 Clarify [~] and [x] checkbox semantics for PR reviews.
 Add example of structured review output.
 
 Related ticket: KD-1234
+EOF
+)"
 ```
 
 ---

@@ -148,7 +148,7 @@ Credential file naming is covered by "Credential File Format" above.
 | Jenkins | `jenkins/` | `jenkins.properties` or `credentials` | `ai-worklog service jenkins` (15 actions) | Controller, job, build and plugin inspection. 14 read-only; only `download-artifact` accepts `--apply`. `syntax-check` runs this repo's own `syntax_check.sh` |
 | GitHub | `github/` | `github.properties` or `credentials` (GH_TOKEN) | — | gh CLI, API calls |
 | Argo CD | `argocd/` | `credentials` (ARGOCD_SERVER, ARGOCD_AUTH_TOKEN) | — | GitOps sync status |
-| Artifactory | `artifactory/` | `credentials` (ARTIFACTORY_URL, ARTIFACTORY_TOKEN) | — | Artifact version queries |
+| Artifactory | `artifactory/` | `artifactory.properties`, `credentials`, or `creds` | `ai-worklog service artifactory` (7 read-only actions) | Profiles, status, protected access checks, repository and artifact listing, metadata, bounded text manifests |
 | Automox | `automox/` | `automox.properties` (profile-scoped), `token`, `server-id` | `ai-worklog service automox` (19 actions) | Endpoint patch management. 14 read-only; 5 accept `--apply` and are dry-run without it (`policy-run`, `worklet-create`, `policy-delete`, `device-move`, `policy-add-group`). Groovy runtime only |
 | SSH | `ssh/` | Config files per environment (cue-stage, cue-prod) | — | Jump host configs, ProxyJump |
 | ServiceNow | `snow/` | `cookie` (session cookie for CHG API) | — | Change management |

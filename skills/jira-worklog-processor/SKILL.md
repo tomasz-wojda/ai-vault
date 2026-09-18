@@ -138,6 +138,7 @@ response-style directive in `.rules` §5. See
 | New Relic operator | `ai-worklog service newrelic` | Read actions include `profiles`, `applications`, `application <ID>`, `hosts <ID>`, `deployments <ID>`, `violations`, `alert-conditions`, `nrql`; mutations and `dashboard-export --apply` require Write Gate |
 | Jenkins operator | `ai-worklog service jenkins` | 14 read actions grouped as controller (`controllers`, `health`, `whoami`, `nodes`, `queue`), jobs (`jobs`, `job`, `seed`, `views`), builds (`artifacts`), config (`plugins`, `credentials`, `credential-domains`) and `syntax-check`; `download-artifact` requires Write Gate and `--apply` |
 | Automox operator | `ai-worklog service automox` | 14 read actions including `profiles`, `orgs`, `groups`, `devices`, `device <ID>`, `device-packages`, `activity`, `patch-summary`, `policies`, `policy`, `policy-stats`, `device-queue`; `policy-run`, `worklet-create`, `policy-delete`, `device-move` and `policy-add-group` require Write Gate and `--apply` |
+| Artifactory operator | `ai-worklog service artifactory` | Read-only `profiles`, `status`, `auth-test`, `repositories`, `artifacts`, `artifact`, and bounded text `manifest`; use the operator instead of reading credential files |
 | AI Worklog | `ai-worklog` on PATH | `preflight`, `ticket prepare`, `state`, `diag`, `delivery`, `closeout` |
 | Worklog template | [worklog.template](worklog.template) | Section scaffold (ships with this skill) |
 | kubectl patterns | `integrations/eks/monitor_commands.txt` | Cluster diagnostics |
