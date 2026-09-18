@@ -11,10 +11,11 @@ not resolve.
 
 ## Non-negotiables
 
-- **Never commit or push.** After changes are applied, provide two git commands
-  the user runs: `git add …` and `git commit -m "$(cat <<'EOF' … EOF)"` with a
-  semantic title and description. Keep each commit-message line at or below
-  70 characters.
+- **Never commit or push.** After changes are applied, provide `git add …` and
+  `git commit -m "title" -m "description…"`. Use exactly two `-m` flags so Git
+  inserts one blank line after the title. The description is one paragraph:
+  wrap at 70 characters per line, no blank lines inside it. Never use HEREDOC
+  or additional `-m` flags.
 - **Journal capture is rule-driven, not hook-driven.** Do not configure Claude
   user or project hooks for turn capture; organization policy blocks them.
   After every response, write the turn to `journal.db` first through

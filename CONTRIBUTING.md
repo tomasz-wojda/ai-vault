@@ -119,7 +119,7 @@ Before submitting any contribution:
 ### Java/Groovy Files
 
 1. Follow the Write Gate Protocol for any file creation or editing. It is specified in `skills/devops-daily-protocol/SKILL.md` § "Write Gate Protocol" and applies to every write in this repository, not only Java and Groovy files.
-2. The agent never commits or pushes. It provides two git commands for the contributor to run: `git add …` and `git commit -m "$(cat <<'EOF' … EOF)"` with a semantic title and description. Each commit-message line must stay at or below 70 characters.
+2. The agent never commits or pushes. It provides `git add …` and `git commit -m "title" -m "description…"`. Use exactly two `-m` flags so Git inserts one blank line after the title. The description is one continuous paragraph: wrap at 70 characters per line, no blank lines inside it. Never use HEREDOC or additional `-m` flags.
 
 ### Jenkins Pipelines
 
@@ -209,48 +209,38 @@ Include in your issue:
 
 ## 9. Commit Message Conventions
 
-The agent never runs git. After changes it provides two commands:
+The agent never runs git. After changes it provides two commands. Use exactly
+two `-m` flags: the first is the title, the second is the full description as
+one continuous paragraph. Git inserts one blank line between them. Do not add
+a third `-m` flag or use HEREDOC — both introduce unwanted blank lines inside
+the description. Wrap description lines at 70 characters; no blank lines inside
+the description.
 
 ```bash
 git add path/to/changed-file ...
-git commit -m "$(cat <<'EOF'
-feat: description of change
-
-Detailed explanation of the change and its impact.
-
-Related ticket: KD-1234
-EOF
-)"
+git commit \
+  -m "feat: description of change" \
+  -m "Detailed explanation of the change and its impact. Related
+ticket: KD-1234"
 ```
-
-Keep every line in the commit message at or below 70 characters.
 
 ### Example Commit Messages
 
 ```bash
 git add skills/devops-daily-protocol/SKILL.md worklog.template
-git commit -m "$(cat <<'EOF'
-feat: add deployment verification mode to devops-daily-protocol
-
-Update SKILL.md with new Deployment Verification workflow mode.
-Add corresponding section to worklog.template.
-
-Related ticket: DEVOPS-9999
-EOF
-)"
+git commit \
+  -m "feat: add deployment verification mode to devops-daily-protocol" \
+  -m "Update SKILL.md with new Deployment Verification workflow mode.
+Add corresponding section to worklog.template. Related ticket:
+DEVOPS-9999"
 ```
 
 ```bash
 git add skills/jira-worklog-processor/SKILL.md
-git commit -m "$(cat <<'EOF'
-docs: update PR review format in jira-worklog-processor/SKILL.md
-
-Clarify [~] and [x] checkbox semantics for PR reviews.
-Add example of structured review output.
-
-Related ticket: KD-1234
-EOF
-)"
+git commit \
+  -m "docs: update PR review format in jira-worklog-processor/SKILL.md" \
+  -m "Clarify [~] and [x] checkbox semantics for PR reviews. Add example
+of structured review output. Related ticket: KD-1234"
 ```
 
 ---

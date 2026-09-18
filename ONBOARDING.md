@@ -197,7 +197,7 @@ ai-vault/
 ### Code Changes
 
 - Follow the Write Gate Protocol for any file creation or editing.
-- The agent never commits or pushes. After changes are applied it provides two git commands for you to run: `git add …` and `git commit -m "$(cat <<'EOF' … EOF)"` with a semantic title and description. Each commit-message line must stay at or below 70 characters.
+- The agent never commits or pushes. After changes are applied it provides `git add …` and `git commit -m "title" -m "description…"`. Use exactly two `-m` flags so Git inserts one blank line after the title. The description is one continuous paragraph: wrap at 70 characters per line, no blank lines inside it. Never use HEREDOC or additional `-m` flags.
 - **Jenkins Pipelines**: run `skills/jenkins-pipeline-architect/scripts/syntax_check.sh` before committing.
 - **Any skill or rule change**: run `scripts/validate-skills.sh` before committing.
 
