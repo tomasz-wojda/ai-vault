@@ -1,6 +1,6 @@
 ---
 name: pr-review-comments
-version: "1.3.0"
+version: "1.4.0"
 description: >-
   Author concise, evidence-backed GitHub PR review comments and prepare
   validated local fixes in the corresponding repos clone. Use when the user
@@ -53,6 +53,38 @@ not on the PR.
 - [ ] 12. Record what was posted in PR.log
 - [ ] 13. Report the permalink and fix status
 ```
+
+## Workspace artifact storage
+
+Keep every PR-review working artifact under:
+
+`<workspace>/tmp/PR-reviews/<ticket-or-topic>/`
+
+Never use the system `/tmp` directory. Resolve `<ticket-or-topic>` in this
+order:
+
+1. The uppercase ticket key when the PR resolves to a ticket
+2. A topic-folder name explicitly supplied by the user
+3. `<owner>-<repository>-pr-<number>` when neither is available
+
+Restrict generated folder names to letters, numbers, dots, underscores, and
+hyphens. Replace every other character run with `-`, then remove leading or
+trailing hyphens. Create the directory once and reuse it throughout the review:
+
+```bash
+REVIEW_TOPIC="$(printf '%s' "$REVIEW_TOPIC" | LC_ALL=C tr -cs 'A-Za-z0-9._-' '-' | sed 's/^-//;s/-$//')"
+REVIEW_DIR="tmp/PR-reviews/${REVIEW_TOPIC}"
+mkdir -p -- "$REVIEW_DIR"
+SOURCE_FILE="${REVIEW_DIR}/pr-${PR_NUMBER}-finding-${FINDING_NUMBER}-source.txt"
+COMMENT_FILE="${REVIEW_DIR}/pr-${PR_NUMBER}-finding-${FINDING_NUMBER}-comment.md"
+VERIFY_FILE="${REVIEW_DIR}/pr-${PR_NUMBER}-finding-${FINDING_NUMBER}-verification.json"
+```
+
+Run the block from the current ai-worklog workspace root and set `REVIEW_TOPIC`
+from the resolution order first. Do not guess or hardcode an absolute workspace
+path. Keep source snapshots, comment Markdown, fenced `suggestion` content, and
+verification output after posting so the review remains reproducible within
+the same workspace.
 
 ### 1. Load prior context from PR.log
 
@@ -158,11 +190,14 @@ Diff line numbers must match the file at the head SHA, and a suggestion block
 must reproduce the original indentation byte for byte.
 
 ```bash
-gh api "repos/<org>/<repo>/contents/<path>?ref=<sha>" --jq '.content' | base64 -d > /tmp/f
-python3 -c "
-lines=open('/tmp/f').read().split('\n')
-for i in range(88,92): print(i+1,'|',repr(lines[i]))
-"
+gh api "repos/<org>/<repo>/contents/<path>?ref=<sha>" \
+  --jq '.content' | base64 -d > "$SOURCE_FILE"
+python3 - "$SOURCE_FILE" <<'PY'
+import sys
+lines = open(sys.argv[1], encoding="utf-8").read().split("\n")
+for i in range(88, 92):
+    print(i + 1, "|", repr(lines[i]))
+PY
 ```
 
 `repr()` rather than `cat`, so tabs and trailing spaces are visible.
@@ -186,7 +221,7 @@ Single line:
 
 ```bash
 gh api "repos/<org>/<repo>/pulls/<N>/comments" -X POST \
-  -F body=@/tmp/comment.md \
+  -F "body=@${COMMENT_FILE}" \
   -f commit_id=<sha> \
   -f path='<path>' \
   -F line=91 \
@@ -198,7 +233,7 @@ Multi-line range, when one defect spans several lines:
 
 ```bash
 gh api "repos/<org>/<repo>/pulls/<N>/comments" -X POST \
-  -F body=@/tmp/comment.md \
+  -F "body=@${COMMENT_FILE}" \
   -f commit_id=<sha> \
   -f path='<path>' \
   -F start_line=41 -F line=52 \
@@ -214,7 +249,8 @@ line or range, body, and `suggestion` fence before reporting success:
 
 ```bash
 gh api repos/<org>/<repo>/pulls/comments/<comment-id> \
-  --jq '{html_url, commit_id, path, start_line, line, body}'
+  --jq '{html_url, commit_id, path, start_line, line, body}' \
+  | tee "$VERIFY_FILE"
 ```
 
 Do not call a comment a one-click suggestion unless the returned body contains
@@ -271,7 +307,8 @@ this log six months later.
 
 Give the user the `html_url` permalink, one sentence on the finding, the merge
 recommendation, whether the comment has an applicable one-click suggestion,
-and whether a validated local fix was prepared.
+whether a validated local fix was prepared, and the workspace artifact
+directory and comment-file path.
 
 ## Production-ready comment contract
 
@@ -328,6 +365,9 @@ spans non-contiguous regions or the user requested explanation only.
 
 Never claim `Suggestion: yes` until the posted comment has been re-read and its
 valid `suggestion` fence and addressable anchor verified.
+
+Keep the fenced `suggestion` in the finding-specific `COMMENT_FILE`; do not
+create or post it from an arbitrary temporary file.
 
 ## Anti-patterns
 
@@ -412,6 +452,8 @@ Prepare the fix:
 - Posting a comment is the only remote write to the PR.
 - Local remediation follows the mode and Write Gate protocols. Never commit or
   push.
+- Store PR-review artifacts only under
+  `<workspace>/tmp/PR-reviews/<ticket-or-topic>/`; never use system `/tmp`.
 - Never mutate the target system to produce evidence.
 - After posting, record the exchange through
   [worklog-chat-memory](../worklog-chat-memory/SKILL.md) § "Record turn events".
