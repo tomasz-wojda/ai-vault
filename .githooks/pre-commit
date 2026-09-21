@@ -22,6 +22,10 @@ STATUS=$?
 
 if [ "${STATUS}" -ne 0 ]; then
     printf '\npre-commit: commit blocked. Fix the findings above and re-stage.\n'
+    exit "${STATUS}"
 fi
 
-exit "${STATUS}"
+CHANGED="$(git diff --cached --name-only --diff-filter=ACMR)"
+if printf '%s\n' "${CHANGED}" | grep -Eq '^(\.rules|CLAUDE\.md|README\.md|ONBOARDING\.md|CONTRIBUTING\.md|\.githooks/pre-commit|harness/|scripts/(commit_handoff\.py|install-cursor-harness\.py|validate-harness\.sh)|tests/test_harness_)'; then
+    ./scripts/validate-harness.sh
+fi

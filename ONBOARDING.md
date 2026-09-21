@@ -28,6 +28,10 @@ ln -s "$VAULT/skills" ~/.cursor/skills      # Cursor
 ln -s "$VAULT/skills" ~/.agent/skills       # AntiGravity
 ln -s "$VAULT/skills" ~/.claude/skills      # Claude Code
 ln -s "$VAULT/.rules" ~/.agent/.rules
+python3 "$VAULT/scripts/install-cursor-harness.py" \
+  --workspace /path/to/workspace
+python3 "$VAULT/scripts/install-cursor-harness.py" \
+  --workspace /path/to/workspace --apply
 
 git clone https://github.com/tomasz-wojda/ai-worklog-framework.git ../ai-worklog-framework
 export PATH="$(cd ../ai-worklog-framework && pwd)/bin:$PATH"
@@ -197,9 +201,9 @@ ai-vault/
 ### Code Changes
 
 - Follow the Write Gate Protocol for any file creation or editing.
-- The agent never commits or pushes. After changes are applied it provides `git add …` and `git commit -m "title" -m "description…"`. Use exactly two `-m` flags so Git inserts one blank line after the title. The description is one continuous paragraph: wrap at 70 characters per line, no blank lines inside it. Never use HEREDOC or additional `-m` flags.
+- Agent Git access is read-only. After changes, run `scripts/commit_handoff.py render` and paste its `git add -- …` and `git commit` blocks exactly. The commit uses exactly two `-m` flags, with one semantic title and one continuous description wrapped at 70 characters. Never use HEREDOC or additional `-m` flags.
 - **Jenkins Pipelines**: run `skills/jenkins-pipeline-architect/scripts/syntax_check.sh` before committing.
-- **Any skill or rule change**: run `scripts/validate-skills.sh` before committing.
+- **Any skill or rule change**: run `scripts/validate-skills.sh` and `scripts/validate-harness.sh` before committing.
 
 ### Worklog Changes
 

@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeShellExecution": [
+      {
+        "command": ".cursor/hooks/ai-vault-guard-git.py",
+        "failClosed": true
+      }
+    ],
+    "afterAgentResponse": [
+      {
+        "command": ".cursor/hooks/ai-vault-capture-response.py",
+        "failClosed": true
+      }
+    ],
+    "stop": [
+      {
+        "command": ".cursor/hooks/ai-vault-require-handoff.py",
+        "failClosed": true,
+        "loop_limit": 2
+      }
+    ]
+  }
+}

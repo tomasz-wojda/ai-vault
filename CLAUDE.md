@@ -11,11 +11,13 @@ not resolve.
 
 ## Non-negotiables
 
-- **Never commit or push.** After changes are applied, provide `git add …` and
-  `git commit -m "title" -m "description…"`. Use exactly two `-m` flags so Git
-  inserts one blank line after the title. The description is one paragraph:
-  wrap at 70 characters per line, no blank lines inside it. Never use HEREDOC
-  or additional `-m` flags.
+- **Git inspection is read-only.** Never run `git add`, `git commit`, or
+  `git push`. After changes are applied, run `scripts/commit_handoff.py render`
+  and paste its two Markdown blocks exactly. The first command is
+  `git add -- …`; the second uses exactly two `-m` flags so Git inserts one
+  blank line after the title. The description is one paragraph wrapped at 70
+  characters per line with no blank lines. Never use HEREDOC or additional
+  `-m` flags.
 - **Journal capture is rule-driven, not hook-driven.** Do not configure Claude
   user or project hooks for turn capture; organization policy blocks them.
   After every response, write the turn to `journal.db` first through

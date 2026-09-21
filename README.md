@@ -103,17 +103,24 @@ mklink C:\Users\YOUR_PROFILE\.gemini\.agent\.rules X:\repositories\ai-vault\.rul
 macOS/Linux:
 ```
 VAULT=/absolute/path/to/ai-vault
-ln -s "$VAULT/.rules" ~/YOUR_WORKSPACE/.rules
 ln -s "$VAULT/.rules" ~/.agent/.rules
+python3 "$VAULT/scripts/install-cursor-harness.py" \
+  --workspace ~/YOUR_WORKSPACE
+python3 "$VAULT/scripts/install-cursor-harness.py" \
+  --workspace ~/YOUR_WORKSPACE --apply
 ```
 
-Claude Code does not read `.rules`; its equivalent is `CLAUDE.md` at the project or
-user level. This repository does not ship one. Under Claude Code the mode protocol
-comes from the `developer-protocol` skill instead.
+The Cursor installer previews before applying. It installs the always-applied
+governance rule and fail-closed hooks at the active workspace root without
+replacing unrelated rules or hooks.
+
+Claude Code does not read `.rules`; its equivalent is `CLAUDE.md`, which this
+repository ships at its root.
 
 ## Validation
 
 Run before every commit that touches `skills/` or `.rules`:
 ```
 ./scripts/validate-skills.sh
+./scripts/validate-harness.sh
 ```

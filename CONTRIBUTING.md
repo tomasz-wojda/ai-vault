@@ -119,7 +119,7 @@ Before submitting any contribution:
 ### Java/Groovy Files
 
 1. Follow the Write Gate Protocol for any file creation or editing. It is specified in `skills/devops-daily-protocol/SKILL.md` § "Write Gate Protocol" and applies to every write in this repository, not only Java and Groovy files.
-2. The agent never commits or pushes. It provides `git add …` and `git commit -m "title" -m "description…"`. Use exactly two `-m` flags so Git inserts one blank line after the title. The description is one continuous paragraph: wrap at 70 characters per line, no blank lines inside it. Never use HEREDOC or additional `-m` flags.
+2. Agent Git access is read-only. After changes, run `scripts/commit_handoff.py render` and paste its two Markdown blocks exactly. The first command is `git add -- …`; the second is `git commit` with exactly two `-m` flags. The description is one continuous paragraph wrapped at 70 characters with no blank lines. Never use HEREDOC or additional `-m` flags.
 
 ### Jenkins Pipelines
 
@@ -141,6 +141,7 @@ Before submitting any contribution:
 
 ```bash
 ./scripts/validate-skills.sh
+./scripts/validate-harness.sh
 
 ./skills/jenkins-pipeline-architect/scripts/syntax_check.sh
 
@@ -209,12 +210,12 @@ Include in your issue:
 
 ## 9. Commit Message Conventions
 
-The agent never runs git. After changes it provides two commands. Use exactly
-two `-m` flags: the first is the title, the second is the full description as
-one continuous paragraph. Git inserts one blank line between them. Do not add
-a third `-m` flag or use HEREDOC — both introduce unwanted blank lines inside
-the description. Wrap description lines at 70 characters; no blank lines inside
-the description.
+Agent Git access is read-only. After changes, run
+`scripts/commit_handoff.py render` and paste its two Markdown blocks exactly.
+The first command is `git add -- …`. The second is `git commit` with exactly
+two `-m` flags: the semantic title and one continuous description. Git inserts
+one blank line between them. Do not add a third `-m` flag or use HEREDOC. Wrap
+description lines at 70 characters with no internal blank lines.
 
 ```bash
 git add path/to/changed-file ...

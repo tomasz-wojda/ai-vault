@@ -1,0 +1,22 @@
+---
+description: Enforces ai-vault repository policy and commit handoff.
+alwaysApply: true
+---
+
+# AI Vault Governance
+
+Before planning or editing `repos/ai-vault`, read its `.rules`, `CLAUDE.md`,
+and `CONTRIBUTING.md`. Add their completion obligations to the task checklist.
+
+Git inspection is read-only. Never run `git add`, `git commit`, or `git push`
+for ai-vault.
+
+After EXECUTE changes, run `scripts/commit_handoff.py render` against ai-vault
+with the semantic title and one-paragraph description. Paste its two Markdown
+blocks exactly:
+
+1. One `git add -- <changed paths>` command.
+2. One `git commit` command with exactly two `-m` flags.
+
+The second `-m` value is one paragraph wrapped at 70 characters with no blank
+line. Never use a HEREDOC or additional `-m` flags.
