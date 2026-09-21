@@ -6,7 +6,7 @@ This document establishes the interaction model, handoff protocols, and unified 
 2. `devops-daily-protocol` (Operational Lifecycle Shell & Tool Contracts)
 3. `jira-worklog-processor` (Worklog Content Generation & Structuring)
 4. `jenkins-pipeline-architect` (CI/CD Pipeline & Scripted Jenkinsfile Patterns)
-5. `pr-review-comments` (Evidence-Backed PR Comment Authoring & Posting)
+5. `pr-review-comments` (PR Comment Authoring & Local Remediation)
 
 ---
 
@@ -29,7 +29,7 @@ stacked on each other:
 │ Layer 4:                        │ Layer 5:                        │
 │ jenkins-pipeline-architect      │ pr-review-comments              │
 │ CI/CD Specialist                │ PR Comment Specialist           │
-│ (Jenkinsfile, CPS, syntax check)│ (evidence bars, inline posting) │
+│ (Jenkinsfile, CPS, syntax check)│ (comments, suggestions, fixes)  │
 └─────────────────────────────────┴─────────────────────────────────┘
 ```
 
@@ -44,7 +44,7 @@ one, both, or neither.
 | **L2** | `devops-daily-protocol` | Tool contracts (JIRA CLI, New Relic operator, kubectl), Write Gate Protocol, prompt.log | When and how tools are invoked, safety enforcement |
 | **L3** | `jira-worklog-processor` | Worklog content patterns, worklog.template, PR.log, ticket-pickup.prompt | What goes inside worklog files, content quality |
 | **L4** | `jenkins-pipeline-architect` | Jenkinsfile patterns, CPS rules, syntax_check.groovy, postJiraComment | How CI/CD pipelines are structured and validated |
-| **L5** | `pr-review-comments` | Evidence bars, comment structure, severity calibration, suggestion blocks, the `POSTED COMMENTS` and `NOT POSTED` blocks of PR.log | How a review finding is proven, worded and anchored on GitHub |
+| **L5** | `pr-review-comments` | Evidence bars, concise comment structure, severity calibration, suggested changes, local remediation, the `POSTED COMMENTS` and `NOT POSTED` blocks of PR.log | How a review finding is proven, worded and anchored on GitHub, and how an explicitly requested fix is prepared in the corresponding clone |
 
 ### Inter-Layer Communication Rules
 
@@ -111,8 +111,8 @@ wins when two of them collide.
 ### 2.8 PR Comment Authoring — owner `pr-review-comments`
 
 - **R-25** A finding reaches the pull request only once it is proven by a read-only execution, bounded by a statement of what it cannot affect, and measured for how often it fires. A finding failing any of the three goes to chat, never to the PR. Evidence is never produced by mutating the target system; if a proof would require a write, say so and stop.
-- **R-26** One inline comment per defect, anchored to its line or contiguous line range at the pinned head SHA — re-fetched, since the author may have pushed. A defect recurring across non-contiguous regions is still one comment, not several. Top-level comments listing multiple findings are not used.
-- **R-27** L5 contributes the `POSTED COMMENTS` and `NOT POSTED` blocks to `PR.log`; L3 owns the entry format and L2 gates the append, so L5 never redefines the entry. Posting the comment is the only write L5 makes to the pull request.
+- **R-26** One concise inline comment per defect, anchored to its line or contiguous line range at the pinned head SHA — re-fetched, since the author may have pushed. Use an applicable one-click suggested change when the complete replacement is addressable in the diff; use a plain replacement and name the limitation when required lines are outside the hunk. A defect recurring across non-contiguous regions is still one comment, not several. Top-level comments listing multiple findings are not used.
+- **R-27** L5 contributes the `POSTED COMMENTS` and `NOT POSTED` blocks to `PR.log`; L3 owns the entry format and L2 gates the append, so L5 never redefines the entry. Posting the comment is L5's only remote write to the pull request. Local remediation is opt-in, resolves and verifies the matching `<workspace>/repos/<owner>-<repository>` clone, and runs only through INNOVATE or PLAN followed by EXECUTE; it stages validated changes but never commits or pushes.
 
 ### 2.9 Composite Sequences
 
@@ -136,7 +136,11 @@ rules and flags shared-library impact (R-17). L3 then takes two gated writes: th
 for a finding to be raised on GitHub, L5 takes over: it proves the finding against
 the live system, anchors one comment per defect at the pinned head SHA (R-25,
 R-26), and contributes its `POSTED COMMENTS` and `NOT POSTED` blocks to the same
-`PR.log` entry (R-27).
+`PR.log` entry (R-27). Review remains read-only. When the user explicitly asks
+for a local fix, L5 carries the proven finding through INNOVATE or PLAN and then
+EXECUTE, verifies the corresponding clone and remote, prepares a focused branch
+from the pinned PR head, validates and stages only the intended files, and
+returns semantic commit metadata without committing or pushing (R-27).
 
 **Incident response.** RESEARCH throughout triage. L2 queries New Relic
 violations, issues and deployments, plus `kubectl`, and runs any catalog-matched
@@ -379,3 +383,4 @@ CHECK 3: Is the Jenkinsfile a valid Groovy file?
 | 3.3 | 2026-09-11 | Documented the Automox operator, implemented in the framework on 2026-09-10 and until now absent from every skill. Added it to R-24's operator list. |
 | 3.4 | 2026-09-11 | Documented the Jenkins operator's 15 actions, of which only `credentials` had been described. Noted in R-16 that its `syntax-check` is a front end to this repo's `syntax_check.sh`, not a rival implementation. |
 | 3.5 | 2026-09-11 | Added `pr-review-comments` as L5, a peer specialist to L4. New §2.8 with R-25..R-27, PR.log co-ownership in the artifact table, and an activation row. The skill had existed since 2026-09-11 with no layer, no rules and no mention here. |
+| 3.6 | 2026-09-21 | Extended L5 with concise production-ready comments, verified one-click suggested changes, and opt-in local remediation in corresponding repos clones without commits or pushes. |

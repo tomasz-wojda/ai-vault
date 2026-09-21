@@ -1,18 +1,18 @@
 ---
 name: pr-review-comments
-version: "1.2.1"
+version: "1.3.0"
 description: >-
-  Author and post evidence-backed GitHub PR review comments. Proves each defect
-  by executing read-only checks against the live system, quantifies severity
-  with measured data, bounds the blast radius, and anchors inline comments to
-  exact lines with one-click suggestion blocks. Use when the user asks to
-  comment on a PR, leave a review comment, flag or raise a finding on a pull
-  request, post findings to GitHub, or says "comment finding N in <PR URL>".
+  Author concise, evidence-backed GitHub PR review comments and prepare
+  validated local fixes in the corresponding repos clone. Use when the user
+  asks to comment on a PR, post a finding, create a suggested change, or fix a
+  proven review finding locally without committing or pushing.
 ---
 
 # PR Review Comments
 
-Covers **authoring and posting** review comments on a GitHub pull request.
+Covers **authoring and posting** review comments on a GitHub pull request and,
+when explicitly requested, preparing a validated fix in the corresponding
+workspace clone.
 
 For comparing a PR diff against a worklog plan and updating checklist markers,
 see [jira-worklog-processor](../jira-worklog-processor/SKILL.md) § "PR Review
@@ -22,8 +22,8 @@ comment reads and where it lands*.
 ## Core principle: evidence over inference
 
 Never report a defect from reading code alone. Prove it by running something
-read-only against the real system and paste the output into the comment. A
-reviewer can dismiss "this looks wrong". They cannot dismiss a transcript.
+read-only against the real system. Include only the smallest output excerpt
+needed to make that proof reproducible.
 
 Every finding must clear three bars before it is posted:
 
@@ -49,8 +49,9 @@ not on the PR.
 - [ ] 8. Check for an existing comment on the same defect
 - [ ] 9. Write the body to a file
 - [ ] 10. Post anchored to the line(s)
-- [ ] 11. Record what was posted in PR.log
-- [ ] 12. Report the permalink back to the user
+- [ ] 11. Re-read and verify the posted comment
+- [ ] 12. Record what was posted in PR.log
+- [ ] 13. Report the permalink and fix status
 ```
 
 ### 1. Load prior context from PR.log
@@ -206,7 +207,20 @@ gh api "repos/<org>/<repo>/pulls/<N>/comments" -X POST \
 
 `-F` for integers, `-f` for strings. Getting this backwards yields a 422.
 
-### 11. Record what was posted in PR.log
+### 11. Verify the posted comment
+
+Re-read the comment from GitHub and verify its permalink, pinned commit, path,
+line or range, body, and `suggestion` fence before reporting success:
+
+```bash
+gh api repos/<org>/<repo>/pulls/comments/<comment-id> \
+  --jq '{html_url, commit_id, path, start_line, line, body}'
+```
+
+Do not call a comment a one-click suggestion unless the returned body contains
+a valid `suggestion` fence on an addressable diff line or contiguous range.
+
+### 12. Record what was posted in PR.log
 
 `PR.log` is owned by [jira-worklog-processor](../jira-worklog-processor/SKILL.md)
 § "PR.log Entry Format", and appends route through the Write Gate Protocol in
@@ -253,39 +267,28 @@ POSTED COMMENTS FOLLOW-UP (YYYY-MM-DDTHH:MM):
 not addressed, and merged anyway is the single most useful thing to find in
 this log six months later.
 
-### 12. Report back
+### 13. Report back
 
-Give the user the `html_url` permalink and one sentence on what the comment
-argues. When several comments were posted, say which is substantive and which
-is cosmetic.
+Give the user the `html_url` permalink, one sentence on the finding, the merge
+recommendation, whether the comment has an applicable one-click suggestion,
+and whether a validated local fix was prepared.
 
-## Comment structure
+## Production-ready comment contract
 
 ```markdown
-**<Severity label> — <one-sentence verdict>.**
+**<Severity> — <merge impact>: <one-sentence defect>.**
 
-### Where it comes from
+<One compact paragraph covering the causal mechanism, minimal proof, affected
+scope, and any boundary or measured frequency that changes triage.>
 
-<Causal chain. Name the two things that disagree and the lines they live on.>
-
-### <Evidence heading>
-
-<Command output or transcript proving it. Real numbers.>
-
-### How serious — <level>
-
-<What it cannot affect, and why. Then the measured probability.>
-
-### Proposed fix
-
-<Suggestion block, plus a note on why adjacent lines need no change.>
-
-<Optional closing note, explicitly marked "no action implied".>
+<One actionable correction, preferably an applicable suggested change.>
 ```
 
-Open with the verdict. The author reads the first line and decides whether to
-keep reading; never make them reach paragraph three to learn whether this
-blocks the merge.
+Keep prose at or below 150 words, excluding suggestion blocks and minimal
+evidence output. Open with severity and merge impact. Use precise production
+behaviour and measured facts; remove conversational filler, repetition,
+speculation, transcript dumps, excessive headings, and unrelated optional
+notes.
 
 ## Severity calibration
 
@@ -300,18 +303,31 @@ Say "non-blocking" in the headline when it is. Reviewers over-weight anything
 that looks like a defect report; stating the opposite is a courtesy that gets
 the real blockers acted on.
 
-## Suggestion blocks
+## Suggested changes and one-click suggestions
 
-Use a `suggestion` fence whenever the fix is a line replacement, so the author
-can apply it in one click. Requirements:
+A **suggested change** is a review comment containing a fenced block tagged
+`suggestion`. GitHub renders an eligible block as a diff with a **Commit
+suggestion** button; this is an **applicable one-click suggestion**. Multiple
+valid suggestions can be batched through **Commit suggestions** in the Files
+changed view unless they are unavailable, outdated, or conflicting.
 
-- Reproduce the original indentation exactly
-- The block replaces the anchored line(s) in full
-- Check whether adjacent lines also need changing, and say so explicitly when
-  they do not, or the fix reads as incomplete
+Prefer an applicable one-click suggestion for every concise, contiguous
+replacement that can be anchored to the current diff. Before posting:
 
-Omit the suggestion when the fix spans multiple non-contiguous regions, or when
-the user asked only for an explanation.
+- Confirm the line or contiguous range is addressable in the diff hunk,
+  including an eligible context line
+- Pin the current head SHA and reproduce indentation exactly
+- Replace the complete anchored range; one line may be replaced by several
+- Include adjacent required edits when they form one contiguous replacement
+- Keep one defect in one comment and one contiguous suggested change
+
+When required lines are outside the diff hunk, GitHub cannot apply them as a
+one-click suggestion. Post a concise plain fenced replacement and state why the
+one-click action is unavailable. Also omit a suggestion when the correction
+spans non-contiguous regions or the user requested explanation only.
+
+Never claim `Suggestion: yes` until the posted comment has been re-read and its
+valid `suggestion` fence and addressable anchor verified.
 
 ## Anti-patterns
 
@@ -340,6 +356,9 @@ which branch a job tracks, check the branch before describing the impact.
 settled findings and risks re-posting a comment, or re-raising something that
 was already weighed and withheld.
 
+**Calling plain code a suggestion.** A replacement outside the diff hunk is
+useful guidance, but it is not an applicable one-click suggestion.
+
 ## Worked example
 
 Defect: a Slack message under-reports an overflow count.
@@ -360,9 +379,39 @@ Defect: a Slack message under-reports an overflow count.
 - **Fix** — one-line suggestion swapping the array length for the total, plus a
   note that the adjacent condition is already equivalent and needs no change.
 
+## Local remediation in the corresponding repo
+
+Review and comment requests are read-only. Prepare a local fix only when the
+user explicitly requests one and the session reaches `MODE: EXECUTE` through
+the developer protocol.
+
+Resolve the clone deterministically:
+
+1. Read `<owner>/<repository>` from the PR metadata.
+2. Resolve `<workspace>/repos/<owner>-<repository>`, preserving GitHub casing.
+3. Normalize and verify a configured GitHub remote matches the PR repository.
+4. Stop if the clone is absent or mismatched. Do not clone or select another
+   repository without an explicit request.
+
+Prepare the fix:
+
+1. Re-fetch and pin the current PR head SHA.
+2. Inspect the local status and current branch before mutation. Stop on
+   unrelated changes rather than overwriting or mixing them.
+3. Create `fix/<ticket>-<finding-slug>`, or
+   `fix/pr-<number>-<finding-slug>` when no ticket exists, from the pinned head.
+4. Apply only the proven finding's correction.
+5. Run the focused reproduction and relevant repository validation.
+6. Verify the final diff contains no unrelated changes.
+7. Stage only the intended files. Never commit or push.
+8. Report the clone path, branch, changed files, validation results, remaining
+   risk, semantic commit title, and one-paragraph commit description.
+
 ## Constraints
 
-- Posting a comment is the only write to the PR. Never commit, never push.
+- Posting a comment is the only remote write to the PR.
+- Local remediation follows the mode and Write Gate protocols. Never commit or
+  push.
 - Never mutate the target system to produce evidence.
 - After posting, record the exchange through
   [worklog-chat-memory](../worklog-chat-memory/SKILL.md) § "Record turn events".
