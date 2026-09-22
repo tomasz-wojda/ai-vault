@@ -4,6 +4,7 @@ import io
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import types
 import unittest
@@ -28,7 +29,7 @@ engine = load_module("handoff_engine", ROOT / "scripts" / "commit_handoff.py")
 baseline = load_module("baseline_hook", HOOKS / "capture-turn-baseline.py")
 capture = load_module("capture_hook", HOOKS / "capture-agent-response.py")
 stop = load_module("stop_hook", HOOKS / "require-commit-handoff.py")
-common = load_module("handoff_common", HOOKS / "handoff_common.py")
+common = sys.modules["handoff_common"]
 installer = load_module(
     "cursor_installer",
     ROOT / "scripts" / "install-cursor-harness.py",
@@ -207,6 +208,39 @@ class ResponseHooksTest(unittest.TestCase):
             "workspace_roots": [str(workspace)],
         }
 
+    def response_fields(self) -> dict:
+        return {
+            "model": "test-model",
+            "input_tokens": 120,
+            "output_tokens": 40,
+            "cache_read_tokens": 80,
+            "cache_write_tokens": 20,
+        }
+
+    def capture_payload(
+        self,
+        workspace: Path,
+        generation: str,
+        text: str,
+    ) -> dict:
+        return {
+            **self.baseline_payload(workspace, generation),
+            **self.response_fields(),
+            "text": text,
+        }
+
+    def stop_payload(
+        self,
+        workspace: Path,
+        generation: str,
+    ) -> dict:
+        return {
+            **self.baseline_payload(workspace, generation),
+            **self.response_fields(),
+            "status": "completed",
+            "loop_count": 0,
+        }
+
     def test_valid_response_allows_stop(self):
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory)
@@ -253,6 +287,272 @@ class ResponseHooksTest(unittest.TestCase):
                 },
             )
             self.assertEqual(stop_output, {})
+
+    def test_mismatched_stop_generation_uses_captured_response(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            captured_generation = "captured-generation"
+            self.invoke(
+                baseline,
+                self.baseline_payload(workspace, captured_generation),
+            )
+            self.invoke(
+                capture,
+                self.capture_payload(
+                    workspace,
+                    captured_generation,
+                    "No repository changes.",
+                ),
+            )
+            output = self.invoke(
+                stop,
+                self.stop_payload(workspace, "different-stop-generation"),
+            )
+            self.assertEqual(output, {})
+            self.assertFalse(
+                common.pending_stop_path("conversation-1").exists()
+            )
+            self.assertFalse(
+                common.state_path(
+                    "conversation-1",
+                    captured_generation,
+                ).exists()
+            )
+
+    def test_mismatched_stop_generation_preserves_invalid_followup(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            repo = workspace / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "-C", str(repo), "init"], check=True)
+            captured_generation = "captured-invalid-generation"
+            self.invoke(
+                baseline,
+                self.baseline_payload(workspace, captured_generation),
+            )
+            (repo / "changed.txt").write_text("changed\n", encoding="utf-8")
+            self.invoke(
+                capture,
+                self.capture_payload(
+                    workspace,
+                    captured_generation,
+                    "No handoff commands.",
+                ),
+            )
+            output = self.invoke(
+                stop,
+                self.stop_payload(workspace, "different-stop-generation"),
+            )
+            self.assertIn("followup_message", output)
+            self.assertIn(str(repo.resolve()), output["followup_message"])
+            self.assertFalse(
+                common.pending_stop_path("conversation-1").exists()
+            )
+
+    def test_exact_generation_state_precedes_pending_fallback(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            exact_generation = "exact-generation"
+            captured_generation = "captured-generation"
+            self.invoke(
+                baseline,
+                self.baseline_payload(workspace, exact_generation),
+            )
+            self.invoke(
+                baseline,
+                self.baseline_payload(workspace, captured_generation),
+            )
+            self.invoke(
+                capture,
+                self.capture_payload(
+                    workspace,
+                    captured_generation,
+                    "No repository changes.",
+                ),
+            )
+            output = self.invoke(
+                stop,
+                self.stop_payload(workspace, exact_generation),
+            )
+            self.assertIn(
+                "response validation state is missing",
+                output["followup_message"],
+            )
+            self.assertFalse(
+                common.pending_stop_path("conversation-1").exists()
+            )
+
+    def test_mismatched_response_signature_fails_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            captured_generation = "captured-generation"
+            self.invoke(
+                baseline,
+                self.baseline_payload(workspace, captured_generation),
+            )
+            self.invoke(
+                capture,
+                self.capture_payload(
+                    workspace,
+                    captured_generation,
+                    "No repository changes.",
+                ),
+            )
+            payload = self.stop_payload(
+                workspace,
+                "different-stop-generation",
+            )
+            payload["output_tokens"] += 1
+            output = self.invoke(stop, payload)
+            self.assertIn(
+                "correlation signature is mismatched",
+                output["followup_message"],
+            )
+            self.assertFalse(
+                common.pending_stop_path("conversation-1").exists()
+            )
+
+    def test_incomplete_stop_signature_fails_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            captured_generation = "captured-generation"
+            self.invoke(
+                baseline,
+                self.baseline_payload(workspace, captured_generation),
+            )
+            self.invoke(
+                capture,
+                self.capture_payload(
+                    workspace,
+                    captured_generation,
+                    "No repository changes.",
+                ),
+            )
+            payload = self.stop_payload(
+                workspace,
+                "different-stop-generation",
+            )
+            del payload["cache_write_tokens"]
+            output = self.invoke(stop, payload)
+            self.assertIn(
+                "stop response signature is incomplete",
+                output["followup_message"],
+            )
+
+    def test_stale_pending_response_fails_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            captured_generation = "captured-generation"
+            self.invoke(
+                baseline,
+                self.baseline_payload(workspace, captured_generation),
+            )
+            self.invoke(
+                capture,
+                self.capture_payload(
+                    workspace,
+                    captured_generation,
+                    "No repository changes.",
+                ),
+            )
+            pending = common.pending_stop_path("conversation-1")
+            metadata = common.read_state(pending)
+            metadata["captured_at_ns"] = (
+                common.time.time_ns()
+                - common.PENDING_STOP_MAX_AGE_NS
+                - 1
+            )
+            common.write_state(pending, metadata)
+            output = self.invoke(
+                stop,
+                self.stop_payload(workspace, "different-stop-generation"),
+            )
+            self.assertIn(
+                "response correlation state is stale",
+                output["followup_message"],
+            )
+
+    def test_corrupt_pending_response_fails_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            captured_generation = "captured-generation"
+            self.invoke(
+                baseline,
+                self.baseline_payload(workspace, captured_generation),
+            )
+            self.invoke(
+                capture,
+                self.capture_payload(
+                    workspace,
+                    captured_generation,
+                    "No repository changes.",
+                ),
+            )
+            common.pending_stop_path("conversation-1").write_text(
+                "{",
+                encoding="utf-8",
+            )
+            output = self.invoke(
+                stop,
+                self.stop_payload(workspace, "different-stop-generation"),
+            )
+            self.assertIn(
+                "response correlation state is corrupt",
+                output["followup_message"],
+            )
+
+    def test_cross_conversation_pending_response_fails_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            captured_generation = "captured-generation"
+            self.invoke(
+                baseline,
+                self.baseline_payload(workspace, captured_generation),
+            )
+            self.invoke(
+                capture,
+                self.capture_payload(
+                    workspace,
+                    captured_generation,
+                    "No repository changes.",
+                ),
+            )
+            pending = common.pending_stop_path("conversation-1")
+            metadata = common.read_state(pending)
+            metadata["conversation_id"] = "different-conversation"
+            common.write_state(pending, metadata)
+            output = self.invoke(
+                stop,
+                self.stop_payload(workspace, "different-stop-generation"),
+            )
+            self.assertIn(
+                "correlation conversation is mismatched",
+                output["followup_message"],
+            )
+
+    def test_new_baseline_clears_pending_response(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            captured_generation = "captured-generation"
+            self.invoke(
+                baseline,
+                self.baseline_payload(workspace, captured_generation),
+            )
+            self.invoke(
+                capture,
+                self.capture_payload(
+                    workspace,
+                    captured_generation,
+                    "No repository changes.",
+                ),
+            )
+            pending = common.pending_stop_path("conversation-1")
+            self.assertTrue(pending.exists())
+            self.invoke(
+                baseline,
+                self.baseline_payload(workspace, "next-generation"),
+            )
+            self.assertFalse(pending.exists())
 
     def test_invalid_response_forces_followup(self):
         with tempfile.TemporaryDirectory() as directory:

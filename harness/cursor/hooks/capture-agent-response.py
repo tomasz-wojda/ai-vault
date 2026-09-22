@@ -8,7 +8,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from handoff_common import (
     MIGRATION_GRACE,
+    correlation_metadata,
     load_engine,
+    pending_stop_path,
     read_state,
     require_ids,
     restore_snapshot,
@@ -18,6 +20,28 @@ from handoff_common import (
 )
 
 
+def persist_validation(
+    path: Path,
+    state: dict,
+    conversation_id: str,
+    generation_id: str,
+    payload: dict,
+) -> None:
+    metadata = correlation_metadata(
+        conversation_id,
+        generation_id,
+        payload,
+    )
+    state.update(
+        {
+            "captured_at_ns": metadata["captured_at_ns"],
+            "response_signature": metadata["response_signature"],
+        }
+    )
+    write_state(path, state)
+    write_state(pending_stop_path(conversation_id), metadata)
+
+
 def main() -> int:
     payload = json.load(sys.stdin)
     conversation_id, generation_id = require_ids(payload)
@@ -25,7 +49,7 @@ def main() -> int:
     if not path.is_file():
         if MIGRATION_GRACE.is_file():
             MIGRATION_GRACE.unlink(missing_ok=True)
-            write_state(
+            persist_validation(
                 path,
                 {
                     "conversation_id": conversation_id,
@@ -35,6 +59,9 @@ def main() -> int:
                     "violations": [],
                     "repo_paths": {},
                 },
+                conversation_id,
+                generation_id,
+                payload,
             )
             print("{}")
             return 0
@@ -68,7 +95,13 @@ def main() -> int:
             "repo_paths": repo_paths,
         }
     )
-    write_state(path, state)
+    persist_validation(
+        path,
+        state,
+        conversation_id,
+        generation_id,
+        payload,
+    )
     print("{}")
     return 0
 

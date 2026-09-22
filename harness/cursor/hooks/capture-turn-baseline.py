@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from handoff_common import (
     MIGRATION_GRACE,
     load_engine,
+    pending_stop_path,
     require_ids,
     state_path,
     write_state,
@@ -20,6 +21,7 @@ def main() -> int:
     payload = json.load(sys.stdin)
     conversation_id, generation_id = require_ids(payload)
     MIGRATION_GRACE.unlink(missing_ok=True)
+    pending_stop_path(conversation_id).unlink(missing_ok=True)
     engine = load_engine()
     repos = engine.discover_git_repos(workspace_roots(payload))
     baselines = {}

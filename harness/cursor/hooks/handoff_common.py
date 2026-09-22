@@ -4,11 +4,20 @@ import importlib.util
 import json
 import os
 import shlex
+import time
 from pathlib import Path
 
 
 STATE_ROOT = Path.home() / ".cursor" / "hook-state" / "git-handoff"
 MIGRATION_GRACE = STATE_ROOT / ".migration-grace"
+PENDING_STOP_MAX_AGE_NS = 300 * 1_000_000_000
+RESPONSE_SIGNATURE_FIELDS = (
+    "model",
+    "input_tokens",
+    "output_tokens",
+    "cache_read_tokens",
+    "cache_write_tokens",
+)
 
 
 def vault_root() -> Path:
@@ -50,6 +59,10 @@ def state_path(conversation_id: str, generation_id: str) -> Path:
     return STATE_ROOT / conversation_id / f"{generation_id}.json"
 
 
+def pending_stop_path(conversation_id: str) -> Path:
+    return STATE_ROOT / conversation_id / ".pending-stop.json"
+
+
 def write_state(path: Path, state: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(".tmp")
@@ -59,6 +72,38 @@ def write_state(path: Path, state: dict) -> None:
 
 def read_state(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def response_signature(payload: dict) -> dict[str, object] | None:
+    signature = {
+        field: payload.get(field)
+        for field in RESPONSE_SIGNATURE_FIELDS
+    }
+    if any(value is None for value in signature.values()):
+        return None
+    return signature
+
+
+def correlation_metadata(
+    conversation_id: str,
+    generation_id: str,
+    payload: dict,
+) -> dict:
+    return {
+        "conversation_id": conversation_id,
+        "generation_id": generation_id,
+        "captured_at_ns": time.time_ns(),
+        "response_signature": response_signature(payload),
+    }
+
+
+def correlation_is_fresh(metadata: dict, now_ns: int | None = None) -> bool:
+    captured_at_ns = metadata.get("captured_at_ns")
+    if not isinstance(captured_at_ns, int):
+        return False
+    current_ns = time.time_ns() if now_ns is None else now_ns
+    age_ns = current_ns - captured_at_ns
+    return 0 <= age_ns <= PENDING_STOP_MAX_AGE_NS
 
 
 def fingerprint_snapshot(repo: Path, engine) -> dict[str, list[object]]:
