@@ -1,21 +1,27 @@
 {
   "version": 1,
   "hooks": {
+    "beforeSubmitPrompt": [
+      {
+        "command": ".cursor/hooks/git-handoff-baseline.py",
+        "failClosed": true
+      }
+    ],
     "beforeShellExecution": [
       {
-        "command": ".cursor/hooks/ai-vault-guard-git.py",
+        "command": ".cursor/hooks/git-handoff-guard-git.py",
         "failClosed": true
       }
     ],
     "afterAgentResponse": [
       {
-        "command": ".cursor/hooks/ai-vault-capture-response.py",
+        "command": ".cursor/hooks/git-handoff-capture-response.py",
         "failClosed": true
       }
     ],
     "stop": [
       {
-        "command": ".cursor/hooks/ai-vault-require-handoff.py",
+        "command": ".cursor/hooks/git-handoff-require-handoff.py",
         "failClosed": true,
         "loop_limit": 2
       }

@@ -29,9 +29,9 @@ ln -s "$VAULT/skills" ~/.agent/skills       # AntiGravity
 ln -s "$VAULT/skills" ~/.claude/skills      # Claude Code
 ln -s "$VAULT/.rules" ~/.agent/.rules
 python3 "$VAULT/scripts/install-cursor-harness.py" \
-  --workspace /path/to/workspace
+  --scope user --migrate-workspace /path/to/workspace
 python3 "$VAULT/scripts/install-cursor-harness.py" \
-  --workspace /path/to/workspace --apply
+  --scope user --migrate-workspace /path/to/workspace --apply
 
 git clone https://github.com/tomasz-wojda/ai-worklog-framework.git ../ai-worklog-framework
 export PATH="$(cd ../ai-worklog-framework && pwd)/bin:$PATH"
@@ -123,7 +123,7 @@ ai-vault/
 The bottom two are peer specialists, invoked by surface rather than stacked: one
 for Jenkins work, one for posting review comments. See
 `skills/CROSS_SKILL_INTEGRATION.md` § 1 for the layer contract and § 2 for the
-twenty-seven rules that govern the handoffs.
+twenty-eight rules that govern the handoffs.
 
 When multiple skills are active, `devops-daily-protocol` governs *when* and *how* to create/update files; `jira-worklog-processor` governs *what goes inside them*.
 
@@ -201,7 +201,7 @@ ai-vault/
 ### Code Changes
 
 - Follow the Write Gate Protocol for any file creation or editing.
-- Agent Git access is read-only. After changes, run `scripts/commit_handoff.py render` and paste its `git add -- …` and `git commit` blocks exactly. The commit uses exactly two `-m` flags, with one semantic title and one continuous description wrapped at 70 characters. Never use HEREDOC or additional `-m` flags.
+- Agent Git access is read-only in every repository. After file changes, run `scripts/commit_handoff.py render` once per repository changed during the current agent generation, passing only attributed paths. Paste each generated `git -C` add/commit pair exactly. The commit uses exactly two `-m` flags, with one semantic title and one continuous description wrapped at 70 characters. Never use HEREDOC or additional `-m` flags. Read-only, clean, and external-only work produces no handoff.
 - **Jenkins Pipelines**: run `skills/jenkins-pipeline-architect/scripts/syntax_check.sh` before committing.
 - **Any skill or rule change**: run `scripts/validate-skills.sh` and `scripts/validate-harness.sh` before committing.
 

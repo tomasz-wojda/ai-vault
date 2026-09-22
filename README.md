@@ -105,14 +105,17 @@ macOS/Linux:
 VAULT=/absolute/path/to/ai-vault
 ln -s "$VAULT/.rules" ~/.agent/.rules
 python3 "$VAULT/scripts/install-cursor-harness.py" \
-  --workspace ~/YOUR_WORKSPACE
+  --scope user --migrate-workspace ~/YOUR_WORKSPACE
 python3 "$VAULT/scripts/install-cursor-harness.py" \
-  --workspace ~/YOUR_WORKSPACE --apply
+  --scope user --migrate-workspace ~/YOUR_WORKSPACE --apply
 ```
 
 The Cursor installer previews before applying. It installs the always-applied
-governance rule and fail-closed hooks at the active workspace root without
-replacing unrelated rules or hooks.
+governance hooks at user scope so every Cursor workspace is covered. The
+optional migration path removes only managed legacy workspace hooks and
+preserves unrelated rules, hooks, regular files, and foreign symlinks. Use
+`--scope workspace --workspace ~/YOUR_WORKSPACE` only when project-scoped
+installation is required.
 
 Claude Code does not read `.rules`; its equivalent is `CLAUDE.md`, which this
 repository ships at its root.

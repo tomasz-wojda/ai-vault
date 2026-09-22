@@ -2,6 +2,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import os
 import subprocess
 import tempfile
 import types
@@ -24,8 +25,10 @@ def load_module(name: str, path: Path):
 
 
 engine = load_module("handoff_engine", ROOT / "scripts" / "commit_handoff.py")
+baseline = load_module("baseline_hook", HOOKS / "capture-turn-baseline.py")
 capture = load_module("capture_hook", HOOKS / "capture-agent-response.py")
 stop = load_module("stop_hook", HOOKS / "require-commit-handoff.py")
+common = load_module("handoff_common", HOOKS / "handoff_common.py")
 installer = load_module(
     "cursor_installer",
     ROOT / "scripts" / "install-cursor-harness.py",
@@ -45,6 +48,31 @@ def run_script(path: Path, payload: dict) -> tuple[int, dict]:
     return result.returncode, output
 
 
+class RepositoryFixture(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.repo = Path(self.temporary.name)
+        subprocess.run(["git", "-C", str(self.repo), "init"], check=True)
+        subprocess.run(
+            ["git", "-C", str(self.repo), "config", "user.email", "test@example.com"],
+            check=True,
+        )
+        subprocess.run(
+            ["git", "-C", str(self.repo), "config", "user.name", "Test User"],
+            check=True,
+        )
+        (self.repo / "tracked.txt").write_text("base\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(self.repo), "add", "tracked.txt"], check=True)
+        subprocess.run(
+            ["git", "-C", str(self.repo), "commit", "-m", "test: base"],
+            check=True,
+            stdout=subprocess.PIPE,
+        )
+
+    def tearDown(self):
+        self.temporary.cleanup()
+
+
 class GuardHookTest(unittest.TestCase):
     def setUp(self):
         self.script = HOOKS / "guard-git-mutations.py"
@@ -56,37 +84,49 @@ class GuardHookTest(unittest.TestCase):
             "sandbox": False,
         }
 
-    def test_denies_add_inside_vault(self):
-        code, output = run_script(
-            self.script,
-            self.payload("git add -- file.txt", ROOT),
-        )
-        self.assertEqual(code, 0)
-        self.assertEqual(output["permission"], "deny")
+    def test_denies_add_inside_git_repo(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            subprocess.run(["git", "-C", str(repo), "init"], check=True)
+            code, output = run_script(
+                self.script,
+                self.payload("git add -- file.txt", repo),
+            )
+            self.assertEqual(code, 0)
+            self.assertEqual(output["permission"], "deny")
 
     def test_denies_git_c_commit(self):
-        code, output = run_script(
-            self.script,
-            self.payload(f"git -C {ROOT} commit -m test", ROOT.parent),
-        )
-        self.assertEqual(code, 0)
-        self.assertEqual(output["permission"], "deny")
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            subprocess.run(["git", "-C", str(repo), "init"], check=True)
+            code, output = run_script(
+                self.script,
+                self.payload(f"git -C {repo} commit -m test", repo.parent),
+            )
+            self.assertEqual(code, 0)
+            self.assertEqual(output["permission"], "deny")
 
     def test_denies_chained_directory_push(self):
-        code, output = run_script(
-            self.script,
-            self.payload(f"cd {ROOT} && git push", ROOT.parent),
-        )
-        self.assertEqual(code, 0)
-        self.assertEqual(output["permission"], "deny")
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            subprocess.run(["git", "-C", str(repo), "init"], check=True)
+            code, output = run_script(
+                self.script,
+                self.payload(f"cd {repo} && git push", repo.parent),
+            )
+            self.assertEqual(code, 0)
+            self.assertEqual(output["permission"], "deny")
 
     def test_allows_read_only_git(self):
-        code, output = run_script(
-            self.script,
-            self.payload("git status --short", ROOT),
-        )
-        self.assertEqual(code, 0)
-        self.assertEqual(output["permission"], "allow")
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            subprocess.run(["git", "-C", str(repo), "init"], check=True)
+            code, output = run_script(
+                self.script,
+                self.payload("git status --short", repo),
+            )
+            self.assertEqual(code, 0)
+            self.assertEqual(output["permission"], "allow")
 
     def test_allows_git_words_inside_command_argument(self):
         code, output = run_script(
@@ -99,7 +139,7 @@ class GuardHookTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(output["permission"], "allow")
 
-    def test_allows_unrelated_repository_add(self):
+    def test_allows_non_git_directory_add(self):
         with tempfile.TemporaryDirectory() as directory:
             code, output = run_script(
                 self.script,
@@ -110,84 +150,137 @@ class GuardHookTest(unittest.TestCase):
 
 
 class ResponseHooksTest(unittest.TestCase):
-    def invoke(self, module, payload: dict, workspace: Path) -> dict:
+    def setUp(self):
+        self.state_root = Path(tempfile.mkdtemp())
+        self.state_patch = mock.patch.object(common, "STATE_ROOT", self.state_root)
+        self.migration_grace = self.state_root / ".migration-grace"
+        self.baseline_grace_patch = mock.patch.object(
+            baseline,
+            "MIGRATION_GRACE",
+            self.migration_grace,
+        )
+        self.capture_grace_patch = mock.patch.object(
+            capture,
+            "MIGRATION_GRACE",
+            self.migration_grace,
+        )
+        self.state_patch.start()
+        self.baseline_grace_patch.start()
+        self.capture_grace_patch.start()
+
+    def tearDown(self):
+        self.capture_grace_patch.stop()
+        self.baseline_grace_patch.stop()
+        self.state_patch.stop()
+        for path in self.state_root.rglob("*"):
+            if path.is_file():
+                path.unlink()
+        for path in sorted(self.state_root.rglob("*"), reverse=True):
+            if path.is_dir():
+                path.rmdir()
+        self.state_root.rmdir()
+
+    def invoke(self, module, payload: dict) -> dict:
         stdin = io.StringIO(json.dumps(payload))
         stdout = io.StringIO()
         with (
-            mock.patch.object(module, "workspace_root", return_value=workspace),
             mock.patch.object(module.sys, "stdin", stdin),
             contextlib.redirect_stdout(stdout),
         ):
             self.assertEqual(module.main(), 0)
         return json.loads(stdout.getvalue()) if stdout.getvalue().strip() else {}
 
+    def invoke_expect_error(self, module, payload: dict):
+        stdin = io.StringIO(json.dumps(payload))
+        stdout = io.StringIO()
+        with (
+            mock.patch.object(module.sys, "stdin", stdin),
+            contextlib.redirect_stdout(stdout),
+            self.assertRaises(RuntimeError),
+        ):
+            module.main()
+
+    def baseline_payload(self, workspace: Path, generation: str) -> dict:
+        return {
+            "conversation_id": "conversation-1",
+            "generation_id": generation,
+            "workspace_roots": [str(workspace)],
+        }
+
     def test_valid_response_allows_stop(self):
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory)
-            paths = ["changed.txt"]
-            response = engine.render_handoff(
-                paths,
-                "feat(governance): validate hook response",
-                "Validate the exact response before allowing the agent to stop.",
+            repo = workspace / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "-C", str(repo), "init"], check=True)
+            subprocess.run(
+                ["git", "-C", str(repo), "config", "user.email", "test@example.com"],
+                check=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(repo), "config", "user.name", "Test User"],
+                check=True,
+            )
+            (repo / "changed.txt").write_text("base\n", encoding="utf-8")
+            subprocess.run(["git", "-C", str(repo), "add", "changed.txt"], check=True)
+            subprocess.run(
+                ["git", "-C", str(repo), "commit", "-m", "test: base"],
+                check=True,
+                stdout=subprocess.PIPE,
             )
             generation = "valid-generation"
-            fake_engine = types.SimpleNamespace(
-                changed_paths=lambda _: paths,
-                validate_response=engine.validate_response,
+            self.invoke(baseline, self.baseline_payload(workspace, generation))
+            (repo / "changed.txt").write_text("changed\n", encoding="utf-8")
+            response = engine.render_handoff(
+                    ["changed.txt"],
+                    "feat(governance): validate hook response",
+                    "Validate the exact response before allowing the agent to stop.",
+                    repo=repo,
             )
-            with mock.patch.object(capture, "load_engine", return_value=fake_engine):
-                capture_output = self.invoke(
-                    capture,
-                    {
-                        "generation_id": generation,
-                        "workspace_roots": [str(workspace)],
-                        "text": response,
-                    },
-                    workspace,
-                )
-            self.assertEqual(capture_output, {})
+            self.invoke(
+                capture,
+                {
+                    **self.baseline_payload(workspace, generation),
+                    "text": response,
+                },
+            )
             stop_output = self.invoke(
                 stop,
                 {
-                    "generation_id": generation,
-                    "workspace_roots": [str(workspace)],
+                    **self.baseline_payload(workspace, generation),
                     "status": "completed",
                     "loop_count": 0,
                 },
-                workspace,
             )
             self.assertEqual(stop_output, {})
 
     def test_invalid_response_forces_followup(self):
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory)
+            repo = workspace / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "-C", str(repo), "init"], check=True)
             generation = "invalid-generation"
-            fake_engine = types.SimpleNamespace(
-                changed_paths=lambda _: ["changed.txt"],
-                validate_response=engine.validate_response,
+            self.invoke(baseline, self.baseline_payload(workspace, generation))
+            (repo / "changed.txt").write_text("changed\n", encoding="utf-8")
+            self.invoke(
+                capture,
+                {
+                    **self.baseline_payload(workspace, generation),
+                    "text": "No handoff commands.",
+                },
             )
-            with mock.patch.object(capture, "load_engine", return_value=fake_engine):
-                self.invoke(
-                    capture,
-                    {
-                        "generation_id": generation,
-                        "workspace_roots": [str(workspace)],
-                        "text": "No handoff commands.",
-                    },
-                    workspace,
-                )
             output = self.invoke(
                 stop,
                 {
-                    "generation_id": generation,
-                    "workspace_roots": [str(workspace)],
+                    **self.baseline_payload(workspace, generation),
                     "status": "completed",
                     "loop_count": 0,
                 },
-                workspace,
             )
             self.assertIn("followup_message", output)
             self.assertIn("exactly two bash blocks", output["followup_message"])
+            self.assertIn(str(repo.resolve()), output["followup_message"])
 
     def test_missing_state_forces_followup(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -195,12 +288,10 @@ class ResponseHooksTest(unittest.TestCase):
             output = self.invoke(
                 stop,
                 {
-                    "generation_id": "missing-generation",
-                    "workspace_roots": [str(workspace)],
+                    **self.baseline_payload(workspace, "missing-generation"),
                     "status": "completed",
                     "loop_count": 1,
                 },
-                workspace,
             )
             self.assertIn("validation state is missing", output["followup_message"])
 
@@ -208,24 +299,16 @@ class ResponseHooksTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory)
             generation = "corrupt-generation"
-            state = (
-                workspace
-                / ".cursor"
-                / "hook-state"
-                / "ai-vault-handoff"
-                / f"{generation}.json"
-            )
+            state = common.state_path("conversation-1", generation)
             state.parent.mkdir(parents=True)
             state.write_text("{", encoding="utf-8")
             output = self.invoke(
                 stop,
                 {
-                    "generation_id": generation,
-                    "workspace_roots": [str(workspace)],
+                    **self.baseline_payload(workspace, generation),
                     "status": "completed",
                     "loop_count": 0,
                 },
-                workspace,
             )
             self.assertIn("validation state is corrupt", output["followup_message"])
 
@@ -233,31 +316,181 @@ class ResponseHooksTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory)
             generation = "no-changes-generation"
-            fake_engine = types.SimpleNamespace(
-                changed_paths=lambda _: [],
-                validate_response=engine.validate_response,
+            self.invoke(baseline, self.baseline_payload(workspace, generation))
+            self.invoke(
+                capture,
+                {
+                    **self.baseline_payload(workspace, generation),
+                    "text": "No repository changes.",
+                },
             )
-            with mock.patch.object(capture, "load_engine", return_value=fake_engine):
-                self.invoke(
-                    capture,
-                    {
-                        "generation_id": generation,
-                        "workspace_roots": [str(workspace)],
-                        "text": "No repository changes.",
-                    },
-                    workspace,
-                )
             output = self.invoke(
                 stop,
                 {
-                    "generation_id": generation,
-                    "workspace_roots": [str(workspace)],
+                    **self.baseline_payload(workspace, generation),
                     "status": "completed",
                     "loop_count": 0,
                 },
-                workspace,
             )
             self.assertEqual(output, {})
+
+    def test_preexisting_dirty_untouched_allows_stop(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            repo = workspace / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "-C", str(repo), "init"], check=True)
+            subprocess.run(
+                ["git", "-C", str(repo), "config", "user.email", "test@example.com"],
+                check=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(repo), "config", "user.name", "Test User"],
+                check=True,
+            )
+            (repo / "dirty.txt").write_text("dirty\n", encoding="utf-8")
+            subprocess.run(["git", "-C", str(repo), "add", "dirty.txt"], check=True)
+            subprocess.run(
+                ["git", "-C", str(repo), "commit", "-m", "test: base"],
+                check=True,
+                stdout=subprocess.PIPE,
+            )
+            (repo / "dirty.txt").write_text("preexisting\n", encoding="utf-8")
+            generation = "preexisting-dirty"
+            self.invoke(baseline, self.baseline_payload(workspace, generation))
+            self.invoke(
+                capture,
+                {
+                    **self.baseline_payload(workspace, generation),
+                    "text": "Read-only turn with unrelated dirty file.",
+                },
+            )
+            output = self.invoke(
+                stop,
+                {
+                    **self.baseline_payload(workspace, generation),
+                    "status": "completed",
+                    "loop_count": 0,
+                },
+            )
+            self.assertEqual(output, {})
+
+    def test_two_repositories_require_two_handoffs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            repo_one = workspace / "one"
+            repo_two = workspace / "two"
+            repo_one.mkdir()
+            repo_two.mkdir()
+            for repo in (repo_one, repo_two):
+                subprocess.run(["git", "-C", str(repo), "init"], check=True)
+                subprocess.run(
+                    ["git", "-C", str(repo), "config", "user.email", "t@example.com"],
+                    check=True,
+                )
+                subprocess.run(
+                    ["git", "-C", str(repo), "config", "user.name", "Test"],
+                    check=True,
+                )
+                (repo / "file.txt").write_text("base\n", encoding="utf-8")
+                subprocess.run(["git", "-C", str(repo), "add", "file.txt"], check=True)
+                subprocess.run(
+                    ["git", "-C", str(repo), "commit", "-m", "test: base"],
+                    check=True,
+                    stdout=subprocess.PIPE,
+                )
+            generation = "two-repos"
+            self.invoke(baseline, self.baseline_payload(workspace, generation))
+            for repo in (repo_one, repo_two):
+                (repo / "file.txt").write_text("changed\n", encoding="utf-8")
+            self.invoke(
+                capture,
+                {
+                    **self.baseline_payload(workspace, generation),
+                    "text": "Missing both handoffs.",
+                },
+            )
+            output = self.invoke(
+                stop,
+                {
+                    **self.baseline_payload(workspace, generation),
+                    "status": "completed",
+                    "loop_count": 0,
+                },
+            )
+            self.assertIn("2 repositories", output["followup_message"])
+            self.assertIn(str(repo_one.resolve()), output["followup_message"])
+            self.assertIn(str(repo_two.resolve()), output["followup_message"])
+
+    def test_repository_created_after_baseline_requires_handoff(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            generation = "new-repository"
+            self.invoke(baseline, self.baseline_payload(workspace, generation))
+            repo = workspace / "new-repo"
+            repo.mkdir()
+            subprocess.run(["git", "-C", str(repo), "init"], check=True)
+            (repo / "created.txt").write_text("created\n", encoding="utf-8")
+            self.invoke(
+                capture,
+                {
+                    **self.baseline_payload(workspace, generation),
+                    "text": "Missing new repository handoff.",
+                },
+            )
+            output = self.invoke(
+                stop,
+                {
+                    **self.baseline_payload(workspace, generation),
+                    "status": "completed",
+                    "loop_count": 0,
+                },
+            )
+            self.assertIn("followup_message", output)
+            self.assertIn(str(repo.resolve()), output["followup_message"])
+            self.assertIn("--path created.txt", output["followup_message"])
+
+    def test_capture_missing_baseline_fails_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            self.invoke_expect_error(
+                capture,
+                {
+                    **self.baseline_payload(workspace, "missing-baseline"),
+                    "text": "No baseline.",
+                },
+            )
+
+    def test_migration_grace_allows_only_inflight_generation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            self.migration_grace.parent.mkdir(parents=True, exist_ok=True)
+            self.migration_grace.write_text("pending\n", encoding="utf-8")
+            payload = {
+                **self.baseline_payload(workspace, "migration-generation"),
+                "text": "Migration turn.",
+            }
+            self.invoke(capture, payload)
+            self.assertFalse(self.migration_grace.exists())
+            output = self.invoke(
+                stop,
+                {
+                    **self.baseline_payload(
+                        workspace,
+                        "migration-generation",
+                    ),
+                    "status": "completed",
+                    "loop_count": 0,
+                },
+            )
+            self.assertEqual(output, {})
+            self.invoke_expect_error(
+                capture,
+                {
+                    **self.baseline_payload(workspace, "next-generation"),
+                    "text": "No baseline.",
+                },
+            )
 
     def test_non_completed_stop_does_not_follow_up(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -265,18 +498,79 @@ class ResponseHooksTest(unittest.TestCase):
             output = self.invoke(
                 stop,
                 {
-                    "generation_id": "aborted-generation",
-                    "workspace_roots": [str(workspace)],
+                    **self.baseline_payload(workspace, "aborted-generation"),
                     "status": "aborted",
                     "loop_count": 0,
                 },
-                workspace,
             )
             self.assertEqual(output, {})
 
 
 class InstallerTest(unittest.TestCase):
-    def test_preview_apply_preserve_and_repeat(self):
+    def invoke_main(self, arguments: list[str]) -> tuple[int, dict]:
+        stdout = io.StringIO()
+        with (
+            mock.patch.object(installer.sys, "argv", ["installer", *arguments]),
+            contextlib.redirect_stdout(stdout),
+        ):
+            code = installer.main()
+        return code, json.loads(stdout.getvalue())
+
+    def test_workspace_argument_preserves_legacy_cli_scope(self):
+        with tempfile.TemporaryDirectory() as directory:
+            code, output = self.invoke_main(["--workspace", directory])
+            self.assertEqual(code, 0)
+            self.assertEqual(output["scope"], "workspace")
+
+    def test_user_scope_preview_apply_and_repeat(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            cursor = home / ".cursor"
+            cursor.mkdir(parents=True)
+            hooks_path = cursor / "hooks.json"
+            hooks_path.write_text(
+                json.dumps(
+                    {
+                        "version": 1,
+                        "hooks": {
+                            "beforeShellExecution": [
+                                {"command": ".cursor/hooks/unrelated.py"}
+                            ]
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with mock.patch.object(Path, "home", return_value=home):
+                actions, hooks, path = installer.plan_install(
+                    "user",
+                    None,
+                    ROOT,
+                    migrate_legacy=False,
+                )
+            self.assertTrue(any(item["status"] == "create" for item in actions))
+            with mock.patch.object(Path, "home", return_value=home):
+                installer.apply_install(actions, hooks, path)
+                installer.verify_install(actions, path, ROOT, "user")
+            installed = json.loads(hooks_path.read_text(encoding="utf-8"))
+            commands = [
+                item["command"]
+                for definitions in installed["hooks"].values()
+                for item in definitions
+            ]
+            self.assertIn(".cursor/hooks/unrelated.py", commands)
+            self.assertIn("hooks/git-handoff-guard-git.py", commands)
+            self.assertIn("hooks/git-handoff-baseline.py", commands)
+            with mock.patch.object(Path, "home", return_value=home):
+                repeated, repeated_hooks, repeated_path = installer.plan_install(
+                    "user",
+                    None,
+                    ROOT,
+                    migrate_legacy=False,
+                )
+            self.assertTrue(all(item["status"] == "unchanged" for item in repeated))
+
+    def test_workspace_preview_apply_preserve_and_repeat(self):
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory)
             cursor = workspace / ".cursor"
@@ -298,36 +592,171 @@ class InstallerTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            actions, hooks, path = installer.plan_install(workspace, ROOT)
+            actions, hooks, path = installer.plan_install(
+                "workspace",
+                workspace,
+                ROOT,
+                migrate_legacy=True,
+            )
             self.assertTrue(any(item["status"] == "create" for item in actions))
-            self.assertFalse((cursor / "hooks" / "ai-vault-guard-git.py").exists())
             installer.apply_install(actions, hooks, path)
-            installer.verify_install(actions, path)
+            installer.verify_install(actions, path, ROOT, "workspace")
             self.assertEqual(memory_rule.read_text(encoding="utf-8"), "memory\n")
+            installed = json.loads(hooks_path.read_text(encoding="utf-8"))
+            commands = [
+                item["command"]
+                for definitions in installed["hooks"].values()
+                for item in definitions
+            ]
+            self.assertIn(".cursor/hooks/unrelated.py", commands)
+            self.assertIn(".cursor/hooks/git-handoff-guard-git.py", commands)
+            self.assertEqual(installed["hooks"]["stop"][0]["loop_limit"], 2)
+            repeated, repeated_hooks, repeated_path = installer.plan_install(
+                "workspace",
+                workspace,
+                ROOT,
+                migrate_legacy=True,
+            )
+            self.assertTrue(all(item["status"] == "unchanged" for item in repeated))
+
+    def test_migrates_legacy_workspace_hooks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            cursor = workspace / ".cursor"
+            hook_dir = cursor / "hooks"
+            hook_dir.mkdir(parents=True)
+            legacy = hook_dir / "ai-vault-guard-git.py"
+            source = HOOKS / "guard-git-mutations.py"
+            legacy.symlink_to(os.path.relpath(source.resolve(), hook_dir.resolve()))
+            hooks_path = cursor / "hooks.json"
+            hooks_path.write_text(
+                json.dumps(
+                    {
+                        "version": 1,
+                        "hooks": {
+                            "beforeShellExecution": [
+                                {
+                                    "command": ".cursor/hooks/ai-vault-guard-git.py",
+                                    "failClosed": True,
+                                },
+                                {"command": ".cursor/hooks/unrelated.py"},
+                            ]
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            actions, hooks, path = installer.plan_install(
+                "workspace",
+                workspace,
+                ROOT,
+                migrate_legacy=True,
+            )
+            installer.apply_install(actions, hooks, path)
+            installer.verify_install(actions, path, ROOT, "workspace")
             installed = json.loads(hooks_path.read_text(encoding="utf-8"))
             commands = [
                 item["command"]
                 for item in installed["hooks"]["beforeShellExecution"]
             ]
+            self.assertNotIn(".cursor/hooks/ai-vault-guard-git.py", commands)
+            self.assertIn(".cursor/hooks/git-handoff-guard-git.py", commands)
             self.assertIn(".cursor/hooks/unrelated.py", commands)
-            self.assertIn(".cursor/hooks/ai-vault-guard-git.py", commands)
-            self.assertEqual(installed["hooks"]["stop"][0]["loop_limit"], 2)
-            repeated, repeated_hooks, repeated_path = installer.plan_install(
+            self.assertFalse(legacy.exists())
+
+    def test_user_migration_removes_legacy_and_installs_generic_rule(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            cursor = workspace / ".cursor"
+            hook_dir = cursor / "hooks"
+            rule_dir = cursor / "rules"
+            hook_dir.mkdir(parents=True)
+            rule_dir.mkdir(parents=True)
+            legacy_hook = hook_dir / "ai-vault-guard-git.py"
+            legacy_hook.symlink_to(
+                os.path.relpath(
+                    (HOOKS / "guard-git-mutations.py").resolve(),
+                    hook_dir.resolve(),
+                )
+            )
+            legacy_rule = rule_dir / "ai-vault-governance.mdc"
+            legacy_rule.symlink_to(
+                os.path.relpath(
+                    (
+                        ROOT
+                        / "harness"
+                        / "cursor"
+                        / "rules"
+                        / "ai-vault-governance.mdc"
+                    ).resolve(),
+                    rule_dir.resolve(),
+                )
+            )
+            hooks_path = cursor / "hooks.json"
+            hooks_path.write_text(
+                json.dumps(
+                    {
+                        "version": 1,
+                        "hooks": {
+                            "beforeShellExecution": [
+                                {
+                                    "command": ".cursor/hooks/ai-vault-guard-git.py"
+                                },
+                                {"command": ".cursor/hooks/unrelated.py"},
+                            ]
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            actions, hooks, path = installer.plan_legacy_removal(
                 workspace,
                 ROOT,
             )
-            self.assertTrue(all(item["status"] == "unchanged" for item in repeated))
-            installer.apply_install(repeated, repeated_hooks, repeated_path)
-            installer.verify_install(repeated, repeated_path)
+            installer.apply_install(actions, hooks, path)
+            installer.verify_legacy_removal(actions, path)
+            installed = json.loads(hooks_path.read_text(encoding="utf-8"))
+            commands = [
+                item["command"]
+                for item in installed["hooks"]["beforeShellExecution"]
+            ]
+            self.assertEqual(commands, [".cursor/hooks/unrelated.py"])
+            self.assertFalse(legacy_hook.exists())
+            self.assertFalse(legacy_rule.exists())
+            self.assertTrue(
+                (rule_dir / "git-handoff-governance.mdc").is_symlink()
+            )
+
+    def test_migration_preserves_foreign_legacy_paths(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            hook_dir = workspace / ".cursor" / "hooks"
+            rule_dir = workspace / ".cursor" / "rules"
+            hook_dir.mkdir(parents=True)
+            rule_dir.mkdir(parents=True)
+            foreign_target = workspace / "foreign.py"
+            foreign_target.write_text("foreign\n", encoding="utf-8")
+            foreign_hook = hook_dir / "ai-vault-guard-git.py"
+            foreign_hook.symlink_to(foreign_target)
+            foreign_rule = rule_dir / "ai-vault-governance.mdc"
+            foreign_rule.write_text("foreign\n", encoding="utf-8")
+            actions, _, _ = installer.plan_legacy_removal(workspace, ROOT)
+            removal_targets = {
+                Path(item["target"])
+                for item in actions
+                if item["kind"] == "symlink-remove"
+            }
+            self.assertNotIn(foreign_hook, removal_targets)
+            self.assertNotIn(foreign_rule, removal_targets)
 
     def test_refuses_to_replace_existing_target(self):
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory)
-            target = workspace / ".cursor" / "hooks" / "ai-vault-guard-git.py"
+            target = workspace / ".cursor" / "hooks" / "git-handoff-guard-git.py"
             target.parent.mkdir(parents=True)
             target.write_text("conflict\n", encoding="utf-8")
             with self.assertRaises(installer.InstallError):
-                installer.plan_install(workspace, ROOT)
+                installer.plan_install("workspace", workspace, ROOT, migrate_legacy=False)
 
 
 if __name__ == "__main__":

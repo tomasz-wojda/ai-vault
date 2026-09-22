@@ -119,7 +119,7 @@ Before submitting any contribution:
 ### Java/Groovy Files
 
 1. Follow the Write Gate Protocol for any file creation or editing. It is specified in `skills/devops-daily-protocol/SKILL.md` § "Write Gate Protocol" and applies to every write in this repository, not only Java and Groovy files.
-2. Agent Git access is read-only. After changes, run `scripts/commit_handoff.py render` and paste its two Markdown blocks exactly. The first command is `git add -- …`; the second is `git commit` with exactly two `-m` flags. The description is one continuous paragraph wrapped at 70 characters with no blank lines. Never use HEREDOC or additional `-m` flags.
+2. Agent Git access is read-only. After file changes, run `scripts/commit_handoff.py render` once per repository changed during the current agent generation, passing only attributed paths. Paste each generated `git -C` add/commit pair exactly. The commit uses exactly two `-m` flags. The description is one continuous paragraph wrapped at 70 characters with no blank lines. Never use HEREDOC or additional `-m` flags. Clean and external-only work produces no handoff.
 
 ### Jenkins Pipelines
 
@@ -210,16 +210,19 @@ Include in your issue:
 
 ## 9. Commit Message Conventions
 
-Agent Git access is read-only. After changes, run
-`scripts/commit_handoff.py render` and paste its two Markdown blocks exactly.
-The first command is `git add -- …`. The second is `git commit` with exactly
-two `-m` flags: the semantic title and one continuous description. Git inserts
-one blank line between them. Do not add a third `-m` flag or use HEREDOC. Wrap
-description lines at 70 characters with no internal blank lines.
+Agent Git access is read-only. After file changes, run
+`scripts/commit_handoff.py render` once per repository changed during the
+current agent generation and pass only attributed paths. Paste each generated
+pair exactly. The first command is `git -C <repo> add -- …`. The second is
+`git -C <repo> commit` with exactly two `-m` flags: the semantic title and one
+continuous description. Git inserts one blank line between them. Do not add a
+third `-m` flag or use HEREDOC. Wrap description lines at 70 characters with no
+internal blank lines. Read-only turns, clean repositories, and external-only
+operations produce no handoff.
 
 ```bash
-git add path/to/changed-file ...
-git commit \
+git -C /path/to/repository add -- path/to/changed-file ...
+git -C /path/to/repository commit \
   -m "feat: description of change" \
   -m "Detailed explanation of the change and its impact. Related
 ticket: KD-1234"
@@ -228,8 +231,8 @@ ticket: KD-1234"
 ### Example Commit Messages
 
 ```bash
-git add skills/devops-daily-protocol/SKILL.md worklog.template
-git commit \
+git -C /path/to/ai-vault add -- skills/devops-daily-protocol/SKILL.md worklog.template
+git -C /path/to/ai-vault commit \
   -m "feat: add deployment verification mode to devops-daily-protocol" \
   -m "Update SKILL.md with new Deployment Verification workflow mode.
 Add corresponding section to worklog.template. Related ticket:
@@ -237,8 +240,8 @@ DEVOPS-9999"
 ```
 
 ```bash
-git add skills/jira-worklog-processor/SKILL.md
-git commit \
+git -C /path/to/ai-vault add -- skills/jira-worklog-processor/SKILL.md
+git -C /path/to/ai-vault commit \
   -m "docs: update PR review format in jira-worklog-processor/SKILL.md" \
   -m "Clarify [~] and [x] checkbox semantics for PR reviews. Add example
 of structured review output. Related ticket: KD-1234"

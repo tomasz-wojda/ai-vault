@@ -1,6 +1,6 @@
 ---
 name: developer-protocol
-version: "1.0.1"
+version: "1.1.0"
 description: Enforces a strict multi-mode workflow (RESEARCH, INNOVATE, PLAN, EXECUTE) to ensure codebase integrity and prevent unauthorized modifications.
 ---
 
@@ -45,6 +45,11 @@ When this skill is active, you must adhere to the following strict protocol to a
     - **Forbidden:** Any modifications, improvements, or creative additions not in the plan.    
     - **Regression Testing:** When modifying an existing script or tool, all existing commands/features must be regression-tested after implementation. Skip only if an individual test execution exceeds 60 seconds; in that case, note the skip and reason in the output.
     - **Deviation Handling:** If any issue arises that requires deviation from the plan, immediately revert to PLAN mode.  
+    - **Repository Handoff:** After file changes, run the ai-vault commit
+      handoff renderer once per repository changed during the current agent
+      generation. Include only current-generation paths. Paste each generated
+      `git -C` add/commit pair exactly. Do not generate a handoff for read-only,
+      clean, or external-only work.
 
 - **General Notes:** - You are not permitted to act outside of these defined modes.
   - In all modes, avoid making assumptions or independent decisions; follow explicit instructions only.

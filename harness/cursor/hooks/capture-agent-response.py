@@ -1,71 +1,75 @@
 #!/usr/bin/env python3
 
-import importlib.util
 import json
-import os
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-sys.dont_write_bytecode = True
-
-
-def load_engine(vault: Path):
-    path = vault / "scripts" / "commit_handoff.py"
-    spec = importlib.util.spec_from_file_location("commit_handoff", path)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"cannot load {path}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-def workspace_root(payload: dict, vault: Path) -> Path:
-    roots = [Path(item).resolve() for item in payload.get("workspace_roots") or []]
-    for root in roots:
-        try:
-            vault.relative_to(root)
-            return root
-        except ValueError:
-            continue
-    raise RuntimeError("ai-vault is not inside a Cursor workspace root")
-
-
-def write_state(path: Path, state: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(".tmp")
-    temporary.write_text(json.dumps(state, sort_keys=True), encoding="utf-8")
-    os.replace(temporary, path)
+from handoff_common import (
+    MIGRATION_GRACE,
+    load_engine,
+    read_state,
+    require_ids,
+    restore_snapshot,
+    state_path,
+    workspace_roots,
+    write_state,
+)
 
 
 def main() -> int:
     payload = json.load(sys.stdin)
-    generation_id = payload.get("generation_id")
-    if not generation_id:
-        raise RuntimeError("generation_id is missing")
-    vault = Path(__file__).resolve().parents[3]
-    workspace = workspace_root(payload, vault)
-    engine = load_engine(vault)
-    paths = engine.changed_paths(vault)
-    if paths:
-        result = engine.validate_response(payload.get("text", ""), paths)
+    conversation_id, generation_id = require_ids(payload)
+    path = state_path(conversation_id, generation_id)
+    if not path.is_file():
+        if MIGRATION_GRACE.is_file():
+            MIGRATION_GRACE.unlink(missing_ok=True)
+            write_state(
+                path,
+                {
+                    "conversation_id": conversation_id,
+                    "generation_id": generation_id,
+                    "validated": True,
+                    "valid": True,
+                    "violations": [],
+                    "repo_paths": {},
+                },
+            )
+            print("{}")
+            return 0
+        raise RuntimeError("commit handoff baseline state is missing")
+    try:
+        state = read_state(path)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError("commit handoff baseline state is corrupt") from exc
+    engine = load_engine()
+    repo_paths: dict[str, list[str]] = {}
+    baselines = state.get("baselines") or {}
+    current_repos = engine.discover_git_repos(workspace_roots(payload))
+    for repo in current_repos:
+        repo_str = str(repo)
+        baseline = restore_snapshot(baselines.get(repo_str) or {})
+        paths = engine.turn_attributed_paths(repo, baseline)
+        if paths:
+            repo_paths[repo_str] = paths
+    if repo_paths:
+        result = engine.validate_response_multi(
+            payload.get("text", ""),
+            repo_paths,
+        )
     else:
         result = {"valid": True, "violations": []}
-    result.update(
+    state.update(
         {
-            "generation_id": generation_id,
-            "paths": paths,
-            "vault": str(vault),
+            "validated": True,
+            "valid": result["valid"],
+            "violations": result.get("violations") or [],
+            "repo_paths": repo_paths,
         }
     )
-    state = (
-        workspace
-        / ".cursor"
-        / "hook-state"
-        / "ai-vault-handoff"
-        / f"{generation_id}.json"
-    )
-    write_state(state, result)
+    write_state(path, state)
+    print("{}")
     return 0
 
 

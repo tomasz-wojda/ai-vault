@@ -12,5 +12,5 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m json.tool \
 printf '\nHarness Validation\n\n'
 printf '  ✓ Commit handoff renderer\n'
 printf '  ✓ Cursor hook behavior\n'
-printf '  ✓ Workspace installer\n'
+printf '  ✓ User/workspace installer\n'
 printf '\nPASS  3 checks\n'

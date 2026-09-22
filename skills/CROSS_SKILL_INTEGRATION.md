@@ -58,7 +58,7 @@ one, both, or neither.
 
 ## 2. Inter-Layer Rules
 
-Twenty-seven rules, grouped by the concern they govern. Each states a constraint
+Twenty-eight rules, grouped by the concern they govern. Each states a constraint
 that binds at decision time. The skill named as owner holds the canonical
 statement of the rule; this document fixes how the layers compose and which rule
 wins when two of them collide.
@@ -114,7 +114,11 @@ wins when two of them collide.
 - **R-26** One concise inline comment per defect, anchored to its line or contiguous line range at the pinned head SHA — re-fetched, since the author may have pushed. Use an applicable one-click suggested change when the complete replacement is addressable in the diff; use a plain replacement and name the limitation when required lines are outside the hunk. A defect recurring across non-contiguous regions is still one comment, not several. Top-level comments listing multiple findings are not used.
 - **R-27** L5 contributes the `POSTED COMMENTS` and `NOT POSTED` blocks to `PR.log`; L3 owns the entry format and L2 gates the append, so L5 never redefines the entry. Posting the comment is L5's only remote write to the pull request. Local remediation is opt-in, resolves and verifies the matching `<workspace>/repos/<owner>-<repository>` clone, and runs only through INNOVATE or PLAN followed by EXECUTE; it stages validated changes but never commits or pushes.
 
-### 2.9 Composite Sequences
+### 2.9 Repository Commit Handoff — owner `developer-protocol`
+
+- **R-28** After EXECUTE file changes, generate one commit handoff per Git repository changed during the current agent generation. Each handoff contains only attributed paths and exactly one `git -C ... add -- ...` command plus one `git -C ... commit` command with a semantic title and one continuous description. Unrelated pre-existing dirt is excluded. Read-only turns, clean repositories, and external-only operations produce no handoff.
+
+### 2.10 Composite Sequences
 
 The rules above compose into three recurring sequences. Each step names the
 owning layer.
@@ -384,3 +388,4 @@ CHECK 3: Is the Jenkinsfile a valid Groovy file?
 | 3.4 | 2026-09-11 | Documented the Jenkins operator's 15 actions, of which only `credentials` had been described. Noted in R-16 that its `syntax-check` is a front end to this repo's `syntax_check.sh`, not a rival implementation. |
 | 3.5 | 2026-09-11 | Added `pr-review-comments` as L5, a peer specialist to L4. New §2.8 with R-25..R-27, PR.log co-ownership in the artifact table, and an activation row. The skill had existed since 2026-09-11 with no layer, no rules and no mention here. |
 | 3.6 | 2026-09-21 | Extended L5 with concise production-ready comments, verified one-click suggested changes, and opt-in local remediation in corresponding repos clones without commits or pushes. |
+| 3.7 | 2026-09-23 | Added R-28: commit handoffs are generated once per repository and only for paths changed during the current agent generation. Clean and external-only work produces no Git commands. |
