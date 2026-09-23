@@ -14,6 +14,9 @@ Git inspection is read-only in every repository. Never run `git add`,
 After EXECUTE file changes, run `repos/ai-vault/scripts/commit_handoff.py
 render` once per repository changed during the current agent generation. Pass
 that repository with `--repo` and only attributed paths with repeated `--path`.
+An attributed path is one directly written by the current agent generation.
+Never infer authorship from a workspace-wide Git diff. Run file-modifying shell
+calls from the affected repository and use separate calls per repository.
 Paste each generated pair of Markdown blocks exactly:
 
 1. One `git -C <repo> add -- <changed paths>` command.

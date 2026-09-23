@@ -10,6 +10,9 @@ from pathlib import Path
 HOOK_LINKS = {
     "git-handoff-baseline.py": "capture-turn-baseline.py",
     "git-handoff-guard-git.py": "guard-git-mutations.py",
+    "git-handoff-file-attribution.py": "record-file-attribution.py",
+    "git-handoff-shell-baseline.py": "capture-shell-baseline.py",
+    "git-handoff-shell-attribution.py": "record-shell-attribution.py",
     "git-handoff-capture-response.py": "capture-agent-response.py",
     "git-handoff-require-handoff.py": "require-commit-handoff.py",
 }

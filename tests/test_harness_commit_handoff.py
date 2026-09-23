@@ -66,23 +66,23 @@ class ChangedPathsTest(RepositoryFixture):
         )
 
 
-class SnapshotTest(RepositoryFixture):
-    def test_turn_attributed_paths_excludes_preexisting_dirty(self):
+class RepositoryDeltaTest(RepositoryFixture):
+    def test_repository_delta_excludes_preexisting_dirty(self):
         (self.repo / "tracked.txt").write_text("preexisting\n", encoding="utf-8")
         baseline = engine.repository_snapshot(self.repo)
         (self.repo / "rename.txt").write_text("changed\n", encoding="utf-8")
         self.assertEqual(
-            engine.turn_attributed_paths(self.repo, baseline),
+            engine.repository_delta_paths(self.repo, baseline),
             ["rename.txt"],
         )
 
-    def test_turn_attributed_paths_excludes_no_net_change(self):
+    def test_repository_delta_excludes_no_net_change(self):
         baseline = engine.repository_snapshot(self.repo)
         (self.repo / "tracked.txt").write_text("changed\n", encoding="utf-8")
         (self.repo / "tracked.txt").write_text("base\n", encoding="utf-8")
-        self.assertEqual(engine.turn_attributed_paths(self.repo, baseline), [])
+        self.assertEqual(engine.repository_delta_paths(self.repo, baseline), [])
 
-    def test_turn_attributed_paths_includes_modified_preexisting_dirty(self):
+    def test_repository_delta_includes_modified_preexisting_dirty(self):
         (self.repo / "tracked.txt").write_text("preexisting\n", encoding="utf-8")
         baseline = engine.repository_snapshot(self.repo)
         (self.repo / "tracked.txt").write_text(
@@ -90,7 +90,7 @@ class SnapshotTest(RepositoryFixture):
             encoding="utf-8",
         )
         self.assertEqual(
-            engine.turn_attributed_paths(self.repo, baseline),
+            engine.repository_delta_paths(self.repo, baseline),
             ["tracked.txt"],
         )
 

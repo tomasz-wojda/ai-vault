@@ -8,7 +8,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from handoff_common import (
     correlation_is_fresh,
-    engine_path,
     pending_stop_path,
     read_state,
     renderer_command,
@@ -53,9 +52,12 @@ def load_validation_state(
     if not correlation_is_fresh(metadata):
         return None, None, "response correlation state is stale"
     signature = response_signature(payload)
-    if signature is None:
-        return None, None, "stop response signature is incomplete"
-    if metadata.get("response_signature") != signature:
+    captured_signature = metadata.get("response_signature")
+    if (
+        signature is not None
+        and captured_signature is not None
+        and captured_signature != signature
+    ):
         return None, None, "response correlation signature is mismatched"
     captured_path = state_path(conversation_id, captured_generation)
     if not captured_path.is_file():
@@ -69,19 +71,17 @@ def load_validation_state(
         or state.get("generation_id") != captured_generation
     ):
         return None, None, "correlated validation identity is mismatched"
-    if state.get("response_signature") != signature:
+    if state.get("captured_at_ns") != metadata.get("captured_at_ns"):
+        return None, None, "correlated validation timestamp is mismatched"
+    if state.get("response_signature") != captured_signature:
         return None, None, "correlated validation signature is mismatched"
     if not state.get("validated"):
         return None, None, "correlated response validation state is missing"
     return captured_path, state, None
 
 
-def state_failure_message(details: str) -> str:
-    return (
-        f"The commit handoff is invalid: {details}. Retry the turn so "
-        "beforeSubmitPrompt and afterAgentResponse can recreate matching "
-        "state. Do not run git add, git commit, or git push."
-    )
+def diagnose(details: str) -> None:
+    print(f"git-handoff hook diagnostic: {details}", file=sys.stderr)
 
 
 def main() -> int:
@@ -98,31 +98,12 @@ def main() -> int:
             generation_id,
         )
         if failure:
-            if failure == "commit handoff validation state is missing":
-                message = (
-                    "The commit handoff is invalid: commit handoff "
-                    "validation state is missing. Ensure the git-handoff "
-                    f"baseline hook ran, then use {engine_path()} render "
-                    "with --repo and --path for each touched repository. "
-                    "Do not run git add, git commit, or git push."
-                )
-            else:
-                message = state_failure_message(failure)
-            print(json.dumps({"followup_message": message}))
+            diagnose(failure)
+            print("{}")
             return 0
         if not state.get("validated"):
-            print(
-                json.dumps(
-                    {
-                        "followup_message": (
-                            "The commit handoff is invalid: response validation "
-                            "state is missing. Ensure afterAgentResponse capture "
-                            "ran before stop. Do not run git add, git commit, or "
-                            "git push."
-                        )
-                    }
-                )
-            )
+            diagnose("response validation state is missing")
+            print("{}")
             return 0
         repo_paths = state.get("repo_paths") or {}
         if not repo_paths:

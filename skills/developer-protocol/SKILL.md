@@ -1,6 +1,6 @@
 ---
 name: developer-protocol
-version: "1.1.0"
+version: "1.1.1"
 description: Enforces a strict multi-mode workflow (RESEARCH, INNOVATE, PLAN, EXECUTE) to ensure codebase integrity and prevent unauthorized modifications.
 ---
 
@@ -50,6 +50,10 @@ When this skill is active, you must adhere to the following strict protocol to a
       generation. Include only current-generation paths. Paste each generated
       `git -C` add/commit pair exactly. Do not generate a handoff for read-only,
       clean, or external-only work.
+      An attributed path is one directly written by the current agent
+      generation. Never infer authorship from a workspace-wide Git diff.
+      File-modifying shell calls must use the affected repository as their
+      working directory and separate calls by repository.
 
 - **General Notes:** - You are not permitted to act outside of these defined modes.
   - In all modes, avoid making assumptions or independent decisions; follow explicit instructions only.

@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from handoff_common import (
     MIGRATION_GRACE,
-    load_engine,
+    clear_generation_tracking,
     pending_stop_path,
     require_ids,
     state_path,
@@ -22,22 +22,13 @@ def main() -> int:
     conversation_id, generation_id = require_ids(payload)
     MIGRATION_GRACE.unlink(missing_ok=True)
     pending_stop_path(conversation_id).unlink(missing_ok=True)
-    engine = load_engine()
-    repos = engine.discover_git_repos(workspace_roots(payload))
-    baselines = {}
-    for repo in repos:
-        baselines[str(repo)] = {
-            path: list(fingerprint)
-            for path, fingerprint in engine.repository_snapshot(repo).items()
-        }
+    clear_generation_tracking(conversation_id, generation_id)
     state = {
         "conversation_id": conversation_id,
         "generation_id": generation_id,
         "workspace_roots": [
             str(root) for root in workspace_roots(payload)
         ],
-        "baselines": baselines,
-        "repos": [str(repo) for repo in repos],
         "validated": False,
         "valid": False,
         "violations": [],

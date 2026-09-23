@@ -19,6 +19,10 @@ not resolve.
   `-m` flags; its description is one paragraph wrapped at 70 characters with
   no blank lines. Never use HEREDOC or additional `-m` flags. Read-only, clean,
   and external-only work produces no handoff.
+- **Attribution is based on direct writes, not repository diffs.** Maintain the
+  explicit set of paths written during the current response. Never infer
+  authorship from workspace-wide Git status. Run file-modifying shell commands
+  from the affected repository and separate commands by repository.
 - **Journal capture is rule-driven, not hook-driven.** Do not configure Claude
   user or project hooks for turn capture; organization policy blocks them.
   After every response, write the turn to `journal.db` first through

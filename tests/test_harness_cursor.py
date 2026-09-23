@@ -27,6 +27,18 @@ def load_module(name: str, path: Path):
 
 engine = load_module("handoff_engine", ROOT / "scripts" / "commit_handoff.py")
 baseline = load_module("baseline_hook", HOOKS / "capture-turn-baseline.py")
+file_attribution = load_module(
+    "file_attribution_hook",
+    HOOKS / "record-file-attribution.py",
+)
+shell_baseline = load_module(
+    "shell_baseline_hook",
+    HOOKS / "capture-shell-baseline.py",
+)
+shell_attribution = load_module(
+    "shell_attribution_hook",
+    HOOKS / "record-shell-attribution.py",
+)
 capture = load_module("capture_hook", HOOKS / "capture-agent-response.py")
 stop = load_module("stop_hook", HOOKS / "require-commit-handoff.py")
 common = sys.modules["handoff_common"]
@@ -241,6 +253,64 @@ class ResponseHooksTest(unittest.TestCase):
             "loop_count": 0,
         }
 
+    def record_edit(
+        self,
+        workspace: Path,
+        generation: str,
+        path: Path,
+    ) -> None:
+        self.invoke(
+            file_attribution,
+            {
+                **self.baseline_payload(workspace, generation),
+                "file_path": str(path),
+                "edits": [],
+            },
+        )
+
+    def shell_payload(
+        self,
+        workspace: Path,
+        generation: str,
+        repo: Path,
+        tool_use_id: str = "shell-tool-1",
+    ) -> dict:
+        return {
+            **self.baseline_payload(workspace, generation),
+            "tool_name": "Shell",
+            "tool_input": {
+                "command": "formatter",
+                "working_directory": str(repo),
+            },
+            "tool_use_id": tool_use_id,
+            "cwd": str(repo),
+        }
+
+    def initialize_repo(
+        self,
+        repo: Path,
+        filename: str = "file.txt",
+    ) -> Path:
+        repo.mkdir()
+        subprocess.run(["git", "-C", str(repo), "init"], check=True)
+        subprocess.run(
+            ["git", "-C", str(repo), "config", "user.email", "test@example.com"],
+            check=True,
+        )
+        subprocess.run(
+            ["git", "-C", str(repo), "config", "user.name", "Test User"],
+            check=True,
+        )
+        path = repo / filename
+        path.write_text("base\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(repo), "add", filename], check=True)
+        subprocess.run(
+            ["git", "-C", str(repo), "commit", "-m", "test: base"],
+            check=True,
+            stdout=subprocess.PIPE,
+        )
+        return path
+
     def test_valid_response_allows_stop(self):
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory)
@@ -265,6 +335,11 @@ class ResponseHooksTest(unittest.TestCase):
             generation = "valid-generation"
             self.invoke(baseline, self.baseline_payload(workspace, generation))
             (repo / "changed.txt").write_text("changed\n", encoding="utf-8")
+            self.record_edit(
+                workspace,
+                generation,
+                repo / "changed.txt",
+            )
             response = engine.render_handoff(
                     ["changed.txt"],
                     "feat(governance): validate hook response",
@@ -331,6 +406,11 @@ class ResponseHooksTest(unittest.TestCase):
                 self.baseline_payload(workspace, captured_generation),
             )
             (repo / "changed.txt").write_text("changed\n", encoding="utf-8")
+            self.record_edit(
+                workspace,
+                captured_generation,
+                repo / "changed.txt",
+            )
             self.invoke(
                 capture,
                 self.capture_payload(
@@ -374,15 +454,12 @@ class ResponseHooksTest(unittest.TestCase):
                 stop,
                 self.stop_payload(workspace, exact_generation),
             )
-            self.assertIn(
-                "response validation state is missing",
-                output["followup_message"],
-            )
+            self.assertEqual(output, {})
             self.assertFalse(
                 common.pending_stop_path("conversation-1").exists()
             )
 
-    def test_mismatched_response_signature_fails_closed(self):
+    def test_mismatched_response_signature_is_non_interrupting(self):
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory)
             captured_generation = "captured-generation"
@@ -404,15 +481,12 @@ class ResponseHooksTest(unittest.TestCase):
             )
             payload["output_tokens"] += 1
             output = self.invoke(stop, payload)
-            self.assertIn(
-                "correlation signature is mismatched",
-                output["followup_message"],
-            )
+            self.assertEqual(output, {})
             self.assertFalse(
                 common.pending_stop_path("conversation-1").exists()
             )
 
-    def test_incomplete_stop_signature_fails_closed(self):
+    def test_incomplete_stop_signature_uses_validated_response(self):
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory)
             captured_generation = "captured-generation"
@@ -434,12 +508,46 @@ class ResponseHooksTest(unittest.TestCase):
             )
             del payload["cache_write_tokens"]
             output = self.invoke(stop, payload)
-            self.assertIn(
-                "stop response signature is incomplete",
-                output["followup_message"],
+            self.assertEqual(output, {})
+            self.assertFalse(
+                common.pending_stop_path("conversation-1").exists()
             )
 
-    def test_stale_pending_response_fails_closed(self):
+    def test_incomplete_stop_signature_preserves_invalid_followup(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            repo = workspace / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "-C", str(repo), "init"], check=True)
+            captured_generation = "captured-generation"
+            self.invoke(
+                baseline,
+                self.baseline_payload(workspace, captured_generation),
+            )
+            (repo / "changed.txt").write_text("changed\n", encoding="utf-8")
+            self.record_edit(
+                workspace,
+                captured_generation,
+                repo / "changed.txt",
+            )
+            self.invoke(
+                capture,
+                self.capture_payload(
+                    workspace,
+                    captured_generation,
+                    "No handoff commands.",
+                ),
+            )
+            payload = self.stop_payload(
+                workspace,
+                "different-stop-generation",
+            )
+            del payload["cache_write_tokens"]
+            output = self.invoke(stop, payload)
+            self.assertIn("followup_message", output)
+            self.assertIn(str(repo.resolve()), output["followup_message"])
+
+    def test_stale_pending_response_is_non_interrupting(self):
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory)
             captured_generation = "captured-generation"
@@ -467,12 +575,9 @@ class ResponseHooksTest(unittest.TestCase):
                 stop,
                 self.stop_payload(workspace, "different-stop-generation"),
             )
-            self.assertIn(
-                "response correlation state is stale",
-                output["followup_message"],
-            )
+            self.assertEqual(output, {})
 
-    def test_corrupt_pending_response_fails_closed(self):
+    def test_corrupt_pending_response_is_non_interrupting(self):
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory)
             captured_generation = "captured-generation"
@@ -496,12 +601,9 @@ class ResponseHooksTest(unittest.TestCase):
                 stop,
                 self.stop_payload(workspace, "different-stop-generation"),
             )
-            self.assertIn(
-                "response correlation state is corrupt",
-                output["followup_message"],
-            )
+            self.assertEqual(output, {})
 
-    def test_cross_conversation_pending_response_fails_closed(self):
+    def test_cross_conversation_pending_response_is_non_interrupting(self):
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory)
             captured_generation = "captured-generation"
@@ -525,10 +627,33 @@ class ResponseHooksTest(unittest.TestCase):
                 stop,
                 self.stop_payload(workspace, "different-stop-generation"),
             )
-            self.assertIn(
-                "correlation conversation is mismatched",
-                output["followup_message"],
+            self.assertEqual(output, {})
+
+    def test_mismatched_pending_timestamp_is_non_interrupting(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            captured_generation = "captured-generation"
+            self.invoke(
+                baseline,
+                self.baseline_payload(workspace, captured_generation),
             )
+            self.invoke(
+                capture,
+                self.capture_payload(
+                    workspace,
+                    captured_generation,
+                    "No repository changes.",
+                ),
+            )
+            pending = common.pending_stop_path("conversation-1")
+            metadata = common.read_state(pending)
+            metadata["captured_at_ns"] += 1
+            common.write_state(pending, metadata)
+            output = self.invoke(
+                stop,
+                self.stop_payload(workspace, "different-stop-generation"),
+            )
+            self.assertEqual(output, {})
 
     def test_new_baseline_clears_pending_response(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -563,6 +688,11 @@ class ResponseHooksTest(unittest.TestCase):
             generation = "invalid-generation"
             self.invoke(baseline, self.baseline_payload(workspace, generation))
             (repo / "changed.txt").write_text("changed\n", encoding="utf-8")
+            self.record_edit(
+                workspace,
+                generation,
+                repo / "changed.txt",
+            )
             self.invoke(
                 capture,
                 {
@@ -582,7 +712,7 @@ class ResponseHooksTest(unittest.TestCase):
             self.assertIn("exactly two bash blocks", output["followup_message"])
             self.assertIn(str(repo.resolve()), output["followup_message"])
 
-    def test_missing_state_forces_followup(self):
+    def test_missing_state_is_non_interrupting(self):
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory)
             output = self.invoke(
@@ -593,9 +723,9 @@ class ResponseHooksTest(unittest.TestCase):
                     "loop_count": 1,
                 },
             )
-            self.assertIn("validation state is missing", output["followup_message"])
+            self.assertEqual(output, {})
 
-    def test_corrupt_state_forces_followup(self):
+    def test_corrupt_state_is_non_interrupting(self):
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory)
             generation = "corrupt-generation"
@@ -610,7 +740,7 @@ class ResponseHooksTest(unittest.TestCase):
                     "loop_count": 0,
                 },
             )
-            self.assertIn("validation state is corrupt", output["followup_message"])
+            self.assertEqual(output, {})
 
     def test_no_changes_allows_response_without_handoff(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -675,6 +805,256 @@ class ResponseHooksTest(unittest.TestCase):
             )
             self.assertEqual(output, {})
 
+    def test_direct_edit_excludes_other_conversation_repository(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            repo_one = workspace / "one"
+            repo_two = workspace / "two"
+            path_one = self.initialize_repo(repo_one)
+            path_two = self.initialize_repo(repo_two)
+            generation_one = "generation-one"
+            generation_two = "generation-two"
+            payload_one = self.baseline_payload(workspace, generation_one)
+            payload_two = {
+                "conversation_id": "conversation-2",
+                "generation_id": generation_two,
+                "workspace_roots": [str(workspace)],
+            }
+            self.invoke(baseline, payload_one)
+            self.invoke(baseline, payload_two)
+            path_one.write_text("agent one\n", encoding="utf-8")
+            self.invoke(
+                file_attribution,
+                {
+                    **payload_one,
+                    "file_path": str(path_one),
+                    "edits": [],
+                },
+            )
+            path_two.write_text("agent two\n", encoding="utf-8")
+            self.invoke(
+                file_attribution,
+                {
+                    **payload_two,
+                    "file_path": str(path_two),
+                    "edits": [],
+                },
+            )
+            self.invoke(
+                capture,
+                {
+                    **payload_one,
+                    "text": "Missing handoff.",
+                },
+            )
+            state = common.read_state(
+                common.state_path("conversation-1", generation_one)
+            )
+            self.assertEqual(
+                state["repo_paths"],
+                {str(repo_one.resolve()): ["file.txt"]},
+            )
+
+    def test_post_edit_collision_excludes_attributed_path(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            repo = workspace / "repo"
+            path = self.initialize_repo(repo)
+            generation = "post-edit-collision"
+            self.invoke(baseline, self.baseline_payload(workspace, generation))
+            path.write_text("agent edit\n", encoding="utf-8")
+            self.record_edit(workspace, generation, path)
+            path.write_text("external edit\n", encoding="utf-8")
+            self.invoke(
+                capture,
+                {
+                    **self.baseline_payload(workspace, generation),
+                    "text": "No handoff.",
+                },
+            )
+            state = common.read_state(
+                common.state_path("conversation-1", generation)
+            )
+            self.assertEqual(state["repo_paths"], {})
+
+    def test_duplicate_edit_events_are_deduplicated(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            repo = workspace / "repo"
+            path = self.initialize_repo(repo)
+            generation = "duplicate-edits"
+            self.invoke(baseline, self.baseline_payload(workspace, generation))
+            path.write_text("first edit\n", encoding="utf-8")
+            self.record_edit(workspace, generation, path)
+            path.write_text("second edit\n", encoding="utf-8")
+            self.record_edit(workspace, generation, path)
+            self.invoke(
+                capture,
+                {
+                    **self.baseline_payload(workspace, generation),
+                    "text": "Missing handoff.",
+                },
+            )
+            state = common.read_state(
+                common.state_path("conversation-1", generation)
+            )
+            self.assertEqual(
+                state["repo_paths"],
+                {str(repo.resolve()): ["file.txt"]},
+            )
+
+    def test_reverted_attributed_path_is_excluded(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            repo = workspace / "repo"
+            path = self.initialize_repo(repo)
+            generation = "reverted-edit"
+            self.invoke(baseline, self.baseline_payload(workspace, generation))
+            path.write_text("agent edit\n", encoding="utf-8")
+            self.record_edit(workspace, generation, path)
+            path.write_text("base\n", encoding="utf-8")
+            self.invoke(
+                capture,
+                {
+                    **self.baseline_payload(workspace, generation),
+                    "text": "No handoff.",
+                },
+            )
+            state = common.read_state(
+                common.state_path("conversation-1", generation)
+            )
+            self.assertEqual(state["repo_paths"], {})
+
+    def test_preexisting_dirty_agent_edit_is_attributed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            repo = workspace / "repo"
+            path = self.initialize_repo(repo)
+            path.write_text("preexisting\n", encoding="utf-8")
+            generation = "preexisting-agent-edit"
+            self.invoke(baseline, self.baseline_payload(workspace, generation))
+            path.write_text("agent edit\n", encoding="utf-8")
+            self.record_edit(workspace, generation, path)
+            self.invoke(
+                capture,
+                {
+                    **self.baseline_payload(workspace, generation),
+                    "text": "Missing handoff.",
+                },
+            )
+            state = common.read_state(
+                common.state_path("conversation-1", generation)
+            )
+            self.assertEqual(
+                state["repo_paths"],
+                {str(repo.resolve()): ["file.txt"]},
+            )
+
+    def test_shell_attribution_is_scoped_to_working_repository(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            repo_one = workspace / "one"
+            repo_two = workspace / "two"
+            path_one = self.initialize_repo(repo_one)
+            path_two = self.initialize_repo(repo_two)
+            generation = "shell-scoped"
+            self.invoke(baseline, self.baseline_payload(workspace, generation))
+            payload = self.shell_payload(
+                workspace,
+                generation,
+                repo_one,
+            )
+            self.assertEqual(
+                self.invoke(shell_baseline, payload),
+                {"permission": "allow"},
+            )
+            path_one.write_text("shell edit\n", encoding="utf-8")
+            path_two.write_text("external edit\n", encoding="utf-8")
+            self.assertEqual(
+                self.invoke(shell_attribution, payload),
+                {},
+            )
+            self.invoke(
+                capture,
+                {
+                    **self.baseline_payload(workspace, generation),
+                    "text": "Missing handoff.",
+                },
+            )
+            state = common.read_state(
+                common.state_path("conversation-1", generation)
+            )
+            self.assertEqual(
+                state["repo_paths"],
+                {str(repo_one.resolve()): ["file.txt"]},
+            )
+
+    def test_failed_shell_still_attributes_side_effects(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            repo = workspace / "repo"
+            path = self.initialize_repo(repo)
+            generation = "failed-shell"
+            self.invoke(baseline, self.baseline_payload(workspace, generation))
+            payload = self.shell_payload(
+                workspace,
+                generation,
+                repo,
+            )
+            self.invoke(shell_baseline, payload)
+            path.write_text("partial shell edit\n", encoding="utf-8")
+            payload.update(
+                {
+                    "hook_event_name": "postToolUseFailure",
+                    "error_message": "failed",
+                    "failure_type": "error",
+                }
+            )
+            self.invoke(shell_attribution, payload)
+            self.invoke(
+                capture,
+                {
+                    **self.baseline_payload(workspace, generation),
+                    "text": "Missing handoff.",
+                },
+            )
+            state = common.read_state(
+                common.state_path("conversation-1", generation)
+            )
+            self.assertEqual(
+                state["repo_paths"],
+                {str(repo.resolve()): ["file.txt"]},
+            )
+
+    def test_shell_without_matching_baseline_adds_no_attribution(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            repo = workspace / "repo"
+            path = self.initialize_repo(repo)
+            generation = "missing-shell-baseline"
+            self.invoke(baseline, self.baseline_payload(workspace, generation))
+            path.write_text("unattributed edit\n", encoding="utf-8")
+            payload = self.shell_payload(
+                workspace,
+                generation,
+                repo,
+            )
+            self.assertEqual(
+                self.invoke(shell_attribution, payload),
+                {},
+            )
+            self.invoke(
+                capture,
+                {
+                    **self.baseline_payload(workspace, generation),
+                    "text": "No handoff.",
+                },
+            )
+            state = common.read_state(
+                common.state_path("conversation-1", generation)
+            )
+            self.assertEqual(state["repo_paths"], {})
+
     def test_two_repositories_require_two_handoffs(self):
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory)
@@ -703,6 +1083,11 @@ class ResponseHooksTest(unittest.TestCase):
             self.invoke(baseline, self.baseline_payload(workspace, generation))
             for repo in (repo_one, repo_two):
                 (repo / "file.txt").write_text("changed\n", encoding="utf-8")
+                self.record_edit(
+                    workspace,
+                    generation,
+                    repo / "file.txt",
+                )
             self.invoke(
                 capture,
                 {
@@ -731,6 +1116,11 @@ class ResponseHooksTest(unittest.TestCase):
             repo.mkdir()
             subprocess.run(["git", "-C", str(repo), "init"], check=True)
             (repo / "created.txt").write_text("created\n", encoding="utf-8")
+            self.record_edit(
+                workspace,
+                generation,
+                repo / "created.txt",
+            )
             self.invoke(
                 capture,
                 {
@@ -861,6 +1251,18 @@ class InstallerTest(unittest.TestCase):
             self.assertIn(".cursor/hooks/unrelated.py", commands)
             self.assertIn("hooks/git-handoff-guard-git.py", commands)
             self.assertIn("hooks/git-handoff-baseline.py", commands)
+            self.assertIn(
+                "hooks/git-handoff-file-attribution.py",
+                commands,
+            )
+            self.assertIn(
+                "hooks/git-handoff-shell-baseline.py",
+                commands,
+            )
+            self.assertIn(
+                "hooks/git-handoff-shell-attribution.py",
+                commands,
+            )
             with mock.patch.object(Path, "home", return_value=home):
                 repeated, repeated_hooks, repeated_path = installer.plan_install(
                     "user",
@@ -910,6 +1312,18 @@ class InstallerTest(unittest.TestCase):
             ]
             self.assertIn(".cursor/hooks/unrelated.py", commands)
             self.assertIn(".cursor/hooks/git-handoff-guard-git.py", commands)
+            self.assertEqual(
+                installed["hooks"]["preToolUse"][0]["matcher"],
+                "Shell",
+            )
+            self.assertEqual(
+                installed["hooks"]["postToolUse"][0]["matcher"],
+                "Shell",
+            )
+            self.assertEqual(
+                installed["hooks"]["postToolUseFailure"][0]["matcher"],
+                "Shell",
+            )
             self.assertEqual(installed["hooks"]["stop"][0]["loop_limit"], 2)
             repeated, repeated_hooks, repeated_path = installer.plan_install(
                 "workspace",

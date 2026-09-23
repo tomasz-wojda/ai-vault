@@ -154,7 +154,7 @@ def snapshot_delta(
     return sorted(key for key in keys if before.get(key) != after.get(key))
 
 
-def turn_attributed_paths(
+def repository_delta_paths(
     repo: Path,
     baseline: dict[str, tuple[object, ...]],
     current: dict[str, tuple[object, ...]] | None = None,

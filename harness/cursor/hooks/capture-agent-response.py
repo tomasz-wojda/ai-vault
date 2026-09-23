@@ -8,14 +8,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from handoff_common import (
     MIGRATION_GRACE,
+    attributed_repo_paths,
     correlation_metadata,
     load_engine,
     pending_stop_path,
     read_state,
     require_ids,
-    restore_snapshot,
     state_path,
-    workspace_roots,
     write_state,
 )
 
@@ -70,17 +69,17 @@ def main() -> int:
         state = read_state(path)
     except (OSError, json.JSONDecodeError) as exc:
         raise RuntimeError("commit handoff baseline state is corrupt") from exc
-    engine = load_engine()
-    repo_paths: dict[str, list[str]] = {}
-    baselines = state.get("baselines") or {}
-    current_repos = engine.discover_git_repos(workspace_roots(payload))
-    for repo in current_repos:
-        repo_str = str(repo)
-        baseline = restore_snapshot(baselines.get(repo_str) or {})
-        paths = engine.turn_attributed_paths(repo, baseline)
-        if paths:
-            repo_paths[repo_str] = paths
+    repo_paths, diagnostics = attributed_repo_paths(
+        conversation_id,
+        generation_id,
+    )
+    for diagnostic in diagnostics:
+        print(
+            f"git-handoff attribution diagnostic: {diagnostic}",
+            file=sys.stderr,
+        )
     if repo_paths:
+        engine = load_engine()
         result = engine.validate_response_multi(
             payload.get("text", ""),
             repo_paths,
