@@ -161,6 +161,69 @@ class GuardHookTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(output["permission"], "allow")
 
+    def guard_decisions(self, commands: list[str]) -> list[str]:
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory) / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "-C", str(repo), "init"], check=True)
+            decisions = []
+            for command in commands:
+                code, output = run_script(
+                    self.script,
+                    self.payload(
+                        command.replace("REPO", str(repo)),
+                        Path(directory),
+                    ),
+                )
+                self.assertEqual(code, 0)
+                decisions.append(output["permission"])
+            return decisions
+
+    def test_allows_git_mutations_inside_quoted_data(self):
+        handoff = (
+            "Done.\n```bash\ngit -C REPO add -- README.md\n```\n"
+            "```bash\ngit -C REPO commit \\\n  -m \"fix: x\" -m \"body\"\n```"
+        )
+        commands = [
+            "cat >\"$PAYLOAD\" <<'JSON'\n"
+            + json.dumps({"assistant_text": handoff})
+            + "\nJSON\n./ai-memory-ingester record-event <\"$PAYLOAD\"",
+            "cat > payload.txt <<'EOF'\n"
+            "git -C REPO add -- a\ngit -C REPO commit -m x\nEOF",
+            "printf '%s\\n' \"ASSISTANT: git -C REPO add -- a && "
+            "git -C REPO commit -m x\" >> prompt.log",
+            "printf '%s\\n' 'USER: ; git -C REPO push' >> prompt.log",
+            "printf '%s\\n' \"| step | git -C REPO add -- a |\" >> prompt.log",
+            "./ai-memory-ingester record-event < payload.json"
+            "  # ; git -C REPO commit -m x",
+            "git -C REPO status --short",
+        ]
+        self.assertEqual(
+            self.guard_decisions(commands),
+            ["allow"] * len(commands),
+        )
+
+    def test_denies_git_mutations_that_execute(self):
+        commands = [
+            "printf '%s\\n' \"Run `git -C REPO add -- a` first\"",
+            "printf '%s\\n' \"x $(git -C REPO commit -m y)\"",
+            "cat <<EOF\n$(git -C REPO push)\nEOF",
+            "bash -lc 'git -C REPO add -- a'",
+            "eval git -C REPO commit -m x",
+            "sudo -u root git -C REPO push",
+            "if git -C REPO commit -m x; then echo ok; fi",
+            "( cd REPO && git add -- a )",
+            "GIT_DIR=x env FOO=1 git -C REPO commit -m x",
+            "echo a | xargs git -C REPO add --",
+            "git -c user.name=x -C REPO commit -m x",
+            "cd \"$TARGET\" && git add -- a",
+            "git -C REPO commit -m 'unterminated",
+        ]
+        self.assertEqual(
+            self.guard_decisions(commands),
+            ["deny"] * len(commands),
+        )
+
 
 class ResponseHooksTest(unittest.TestCase):
     def setUp(self):

@@ -28,8 +28,11 @@ not resolve.
   After every response, write the turn to `journal.db` first through
   `ai-memory-ingester record-event` with JSON on stdin per
   `skills/worklog-chat-memory/references/journal-writer-contract.json`, using
-  exact user text and exact final assistant response text. Only after a
-  successful write append the same current `prompt.log` audit entry. If
+  exact user text and exact final assistant response text. Write the payload
+  with the Write tool and run
+  `skills/worklog-chat-memory/scripts/record_turn.py`, which appends the same
+  current `prompt.log` audit entry only after a successful write. Never put
+  conversational text in a shell command, `printf`, or heredoc. If
   `record-event` fails, leave the failure visible and do not append
   `prompt.log`. Never overwrite `prompt.log`; create it only if absent.
 - **Read before Write.** The Write tool overwrites; it does not append. If a file

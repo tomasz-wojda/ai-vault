@@ -1,6 +1,6 @@
 ---
 name: devops-daily-protocol
-version: "1.1.7"
+version: "1.1.8"
 description: >-
   Orchestrates daily DevOps operations: pulling JIRA tickets, selecting work items,
   creating structured worklog files, integrating ai-worklog and New Relic monitoring,
@@ -435,10 +435,10 @@ The file `worklog/tickets.log` stores the latest output from `ai-worklog service
 
 After every interaction, follow
 [worklog-chat-memory](../worklog-chat-memory/SKILL.md) § "Record turn events".
-Write `journal.db` synchronously first with exact user text and exact final
-assistant response through `ai-memory-ingester record-event` and JSON on stdin.
-Only after success append the shadow audit entry to `prompt.log` at the
-workspace root:
+Write `journal.db` first with exact user text and exact final assistant
+response: `record_turn.py` sends a payload file to `record-event` on stdin, so
+the response never enters a shell command. Only after success append the
+shadow audit entry to `prompt.log` at the workspace root:
 
 ```
 --- PROMPT LOG ENTRY ---

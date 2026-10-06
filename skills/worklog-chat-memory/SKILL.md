@@ -1,6 +1,6 @@
 ---
 name: worklog-chat-memory
-version: "1.2.0"
+version: "1.3.0"
 description: >-
   Retrieves and maintains workspace conversation memory from the immutable
   SQLite journal, materialized turns, and tiered SQLite indexes. Use when
@@ -178,47 +178,55 @@ Required payload fields:
 
 When available also supply `session_id`, `prompt_id`, `mode`, `tickets`,
 `impact`, `event_time`, `event_time_confidence`, and `raw_payload`. Never
-pass conversational payload through shell arguments; write JSON to a temporary
-file or pipe it on stdin.
+pass conversational payload through shell arguments, `printf`, or a heredoc:
+shell commands are checked by Git guard hooks, and double-quoted text runs
+command substitutions.
 
-```bash
-: "${MEMORY_WORKSPACE_ROOT:?Set MEMORY_WORKSPACE_ROOT}"
-MEMORY_REPO="${MEMORY_WORKSPACE_ROOT}/repos/ai-memory-ingester"
-PAYLOAD="$(mktemp)"
-trap 'rm -f "${PAYLOAD}"' EXIT
-cat >"${PAYLOAD}" <<'JSON'
-{
-  "schema_version": 1,
-  "source_ide": "cursor",
-  "source_kind": "rule_write",
-  "source_fidelity": "rule_write",
-  "source_identity": "prompt.log",
-  "session_id": "promptlog:2026-09-14",
-  "prompt_id": "turn-example",
-  "user_text": "<exact user prompt>",
-  "assistant_text": "<exact final assistant response>",
-  "outcome_summary": "<optional short outcome>",
-  "mode": "execute",
-  "tickets": ["DEVOPS-1"],
-  "impact": "high",
-  "event_time": "2026-09-14T16:00:00Z",
-  "event_time_confidence": "exact",
-  "raw_payload": "USER:\n<exact user prompt>\n\nASSISTANT:\n<exact final assistant response>"
-}
-JSON
-cd "${MEMORY_REPO}"
-if ./ai-memory-ingester record-event <"${PAYLOAD}"; then
-  printf '%s\n' "--- PROMPT LOG ENTRY ---" >> "${MEMORY_WORKSPACE_ROOT}/prompt.log"
-  printf '%s\n' "TIMESTAMP: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "${MEMORY_WORKSPACE_ROOT}/prompt.log"
-  printf '%s\n' "USER: <exact user prompt>" >> "${MEMORY_WORKSPACE_ROOT}/prompt.log"
-  printf '%s\n' "ASSISTANT: <mode> — <exact final assistant response>" >> "${MEMORY_WORKSPACE_ROOT}/prompt.log"
-  printf '%s\n' "--- END PROMPT LOG ENTRY ---" >> "${MEMORY_WORKSPACE_ROOT}/prompt.log"
-fi
-```
+Every IDE runs the same two steps; only `source_ide` differs (`cursor`,
+`claude`, or `antigravity`). `<workspace>` is the absolute workspace root.
 
-Claude Code and AntiGravity use the same contract and command with their
-`source_ide` value. Do not rely on Claude user or project hooks for capture;
-organization policy blocks them and rules remain the portable adapter.
+1. Write the payload JSON with the IDE file-write tool (Cursor edit tool,
+   Claude Code `Write`) to `<workspace>/tmp/journal-turns/<prompt_id>.json`,
+   outside any Git repository so commit handoff attribution ignores it:
+
+   ```json
+   {
+     "schema_version": 1,
+     "source_ide": "cursor",
+     "source_kind": "rule_write",
+     "source_fidelity": "rule_write",
+     "source_identity": "prompt.log",
+     "session_id": "promptlog:2026-09-14",
+     "prompt_id": "turn-example",
+     "user_text": "<exact user prompt>",
+     "assistant_text": "<exact final assistant response>",
+     "outcome_summary": "<optional short outcome>",
+     "mode": "execute",
+     "tickets": ["DEVOPS-1"],
+     "impact": "high",
+     "event_time": "2026-09-14T16:00:00Z",
+     "event_time_confidence": "exact",
+     "raw_payload": "USER:\n<exact user prompt>\n\nASSISTANT:\n<exact final assistant response>"
+   }
+   ```
+
+2. Record it from `<workspace>`. The command carries only paths, and the
+   script finds the workspace root from the payload location:
+
+   ```bash
+   python3 repos/ai-vault/skills/worklog-chat-memory/scripts/record_turn.py \
+     --payload tmp/journal-turns/turn-example.json
+   ```
+
+`record_turn.py` validates the required fields, pipes the file to
+`ai-memory-ingester record-event` on stdin, and only after success appends the
+`prompt.log` entry (`USER: <user_text>`, `ASSISTANT: <mode> — <assistant_text>`)
+and deletes the payload. On failure it exits non-zero, keeps the payload for a
+retry, and does not touch `prompt.log`.
+
+Do not rely on Claude user or project hooks for capture; organization policy
+blocks them and rules remain the portable adapter. In Cursor, the payload file
+and the command pass the Git guard and attribution hooks unchanged.
 
 ## Synchronize memory
 
