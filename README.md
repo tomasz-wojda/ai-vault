@@ -120,6 +120,12 @@ installation is required.
 Claude Code does not read `.rules`; its equivalent is `CLAUDE.md`, which this
 repository ships at its root.
 
+`--migrate-workspace` and `--scope workspace` also link
+`harness/cursor/rules/*.mdc` into the workspace `.cursor/rules/` and write the
+workspace `CLAUDE.md` from `harness/claude/CLAUDE.md`, so Cursor and Claude Code
+load the same workspace rules. An existing file is replaced only when it is
+identical to the managed copy or carries the managed `CLAUDE.md` marker.
+
 ## Validation
 
 Run before every commit that touches `skills/` or `.rules`:

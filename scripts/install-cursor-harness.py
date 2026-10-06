@@ -31,7 +31,10 @@ LEGACY_HOOK_COMMANDS = {
 }
 RULE_LINKS = {
     "git-handoff-governance.mdc": "git-handoff-governance.mdc",
+    "worklog-chat-memory.mdc": "worklog-chat-memory.mdc",
 }
+CLAUDE_TEMPLATE = Path("harness") / "claude" / "CLAUDE.md"
+CLAUDE_MARKER = "<!-- Managed by repos/ai-vault/scripts/install-cursor-harness.py."
 
 
 class InstallError(RuntimeError):
@@ -120,6 +123,12 @@ def link_action(source: Path, target: Path) -> dict:
     elif target.exists() or target.is_symlink():
         if managed_relative(source, target):
             status = "unchanged"
+        elif (
+            target.is_file()
+            and not target.is_symlink()
+            and target.read_bytes() == source.read_bytes()
+        ):
+            status = "adopt"
         else:
             raise InstallError(f"refusing to replace {target}")
     else:
@@ -129,6 +138,29 @@ def link_action(source: Path, target: Path) -> dict:
         "source": str(source),
         "target": str(target),
         "relative": relative,
+        "status": status,
+    }
+
+
+def claude_action(vault: Path, workspace: Path) -> dict:
+    content = (vault / CLAUDE_TEMPLATE).read_text(encoding="utf-8")
+    target = workspace / "CLAUDE.md"
+    if not target.exists() and not target.is_symlink():
+        status = "create"
+    elif target.is_symlink() or not target.is_file():
+        raise InstallError(f"refusing to replace {target}")
+    else:
+        current = target.read_text(encoding="utf-8")
+        if current == content:
+            status = "unchanged"
+        elif current.startswith(CLAUDE_MARKER):
+            status = "update"
+        else:
+            raise InstallError(f"refusing to replace unmanaged {target}")
+    return {
+        "kind": "file",
+        "source": str(vault / CLAUDE_TEMPLATE),
+        "target": str(target),
         "status": status,
     }
 
@@ -183,13 +215,17 @@ def plan_install(
         for target_name, source_name in RULE_LINKS.items():
             source = vault / "harness" / "cursor" / "rules" / source_name
             actions.append(link_action(source, rule_dir / target_name))
+        actions.append(claude_action(vault, workspace))
     hooks_path = cursor / "hooks.json"
     current = load_json(hooks_path, {"version": 1, "hooks": {}})
     fragment = hook_fragment(vault, scope)
     merged = merge_hooks(current, fragment)
     if migrate_legacy:
         merged = remove_legacy_hook_entries(merged)
-    changed = any(action["status"] == "create" for action in actions)
+    changed = any(
+        action["status"] in {"create", "adopt", "update"}
+        for action in actions
+    )
     changed = changed or merged != current
     if scope == "user" and changed:
         actions.append(
@@ -236,6 +272,7 @@ def plan_legacy_removal(
     for target_name, source_name in RULE_LINKS.items():
         source = vault / "harness" / "cursor" / "rules" / source_name
         actions.append(link_action(source, rule_dir / target_name))
+    actions.append(claude_action(vault, workspace))
     hooks_path = cursor / "hooks.json"
     current = load_json(hooks_path, {"version": 1, "hooks": {}})
     merged = remove_legacy_hook_entries(current)
@@ -252,9 +289,15 @@ def plan_legacy_removal(
 def apply_install(actions: list[dict], hooks: dict, hooks_path: Path) -> None:
     for action in actions:
         target = Path(action["target"])
-        if action["kind"] == "symlink" and action["status"] == "create":
+        if action["kind"] == "symlink" and action["status"] in {"create", "adopt"}:
             target.parent.mkdir(parents=True, exist_ok=True)
+            target.unlink(missing_ok=True)
             target.symlink_to(action["relative"])
+        if action["kind"] == "file" and action["status"] in {"create", "update"}:
+            target.write_text(
+                Path(action["source"]).read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
         if action["kind"] == "symlink-remove" and action["status"] == "remove":
             target.unlink(missing_ok=True)
         if action["kind"] == "grace-marker" and action["status"] == "create":
@@ -280,6 +323,12 @@ def verify_install(
         if action["kind"] == "grace-marker":
             if not Path(action["target"]).is_file():
                 raise InstallError("migration grace marker was not created")
+            continue
+        if action["kind"] == "file":
+            target = Path(action["target"])
+            expected = Path(action["source"]).read_text(encoding="utf-8")
+            if target.read_text(encoding="utf-8") != expected:
+                raise InstallError(f"installed file is outdated: {target}")
             continue
         if action["kind"] not in {"symlink", "symlink-remove"}:
             continue
@@ -311,6 +360,10 @@ def verify_legacy_removal(actions: list[dict], hooks_path: Path) -> None:
         target = Path(action["target"])
         if action["kind"] == "symlink-remove" and target.exists():
             raise InstallError(f"legacy managed link was not removed: {target}")
+        if action["kind"] == "file":
+            expected = Path(action["source"]).read_text(encoding="utf-8")
+            if target.read_text(encoding="utf-8") != expected:
+                raise InstallError(f"installed file is outdated: {target}")
         if action["kind"] == "symlink":
             if not target.is_symlink() or not target.resolve().is_file():
                 raise InstallError(f"installed link is invalid: {target}")

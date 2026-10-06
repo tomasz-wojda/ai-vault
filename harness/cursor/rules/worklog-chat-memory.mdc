@@ -1,0 +1,13 @@
+---
+description: Injects recent worklog memory and governs journal synchronization.
+alwaysApply: true
+---
+
+# Worklog Chat Memory
+
+@worklog-chat/RESUME.md
+
+- At session start, run `sweep-memory` to synchronize journals, worklogs, databases, datasets, and the digest before relying on historical memory.
+- After every response, record the turn through the governed `worklog-chat-memory` shared writer: write the payload JSON (exact user text, exact final assistant response, `source_ide` set to this IDE) with the file-write tool to `tmp/journal-turns/<prompt_id>.json`, then run `python3 repos/ai-vault/skills/worklog-chat-memory/scripts/record_turn.py --payload tmp/journal-turns/<prompt_id>.json` from the workspace root. It writes `journal.db` through `ai-memory-ingester record-event` and only on success appends the same current `prompt.log` audit entry; if it fails, leave the failure visible. Never put conversational text in a shell command, `printf`, or heredoc.
+- When a response relies on memory, name the digest, turn file, or database query consulted.
+- Follow the governed `worklog-chat-memory` skill for the JSON writer contract, search, facet discovery, and safe ingestion recipes.

@@ -1341,7 +1341,7 @@ class InstallerTest(unittest.TestCase):
             cursor = workspace / ".cursor"
             rules = cursor / "rules"
             rules.mkdir(parents=True)
-            memory_rule = rules / "worklog-chat-memory.mdc"
+            memory_rule = rules / "team-notes.mdc"
             memory_rule.write_text("memory\n", encoding="utf-8")
             hooks_path = cursor / "hooks.json"
             hooks_path.write_text(
@@ -1367,6 +1367,13 @@ class InstallerTest(unittest.TestCase):
             installer.apply_install(actions, hooks, path)
             installer.verify_install(actions, path, ROOT, "workspace")
             self.assertEqual(memory_rule.read_text(encoding="utf-8"), "memory\n")
+            self.assertTrue((rules / "worklog-chat-memory.mdc").is_symlink())
+            self.assertEqual(
+                (workspace / "CLAUDE.md").read_text(encoding="utf-8"),
+                (ROOT / "harness" / "claude" / "CLAUDE.md").read_text(
+                    encoding="utf-8"
+                ),
+            )
             installed = json.loads(hooks_path.read_text(encoding="utf-8"))
             commands = [
                 item["command"]
@@ -1395,6 +1402,91 @@ class InstallerTest(unittest.TestCase):
                 migrate_legacy=True,
             )
             self.assertTrue(all(item["status"] == "unchanged" for item in repeated))
+
+    def install_workspace(self, workspace: Path) -> list[dict]:
+        actions, hooks, path = installer.plan_install(
+            "workspace",
+            workspace,
+            ROOT,
+            migrate_legacy=True,
+        )
+        installer.apply_install(actions, hooks, path)
+        installer.verify_install(actions, path, ROOT, "workspace")
+        return actions
+
+    def test_workspace_adopts_identical_memory_rule(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            rule = workspace / ".cursor" / "rules" / "worklog-chat-memory.mdc"
+            rule.parent.mkdir(parents=True)
+            source = ROOT / "harness" / "cursor" / "rules" / rule.name
+            rule.write_bytes(source.read_bytes())
+            actions = self.install_workspace(workspace)
+            statuses = {
+                Path(item["target"]).name: item["status"] for item in actions
+            }
+            self.assertEqual(statuses["worklog-chat-memory.mdc"], "adopt")
+            self.assertTrue(rule.is_symlink())
+            self.assertEqual(rule.resolve(), source.resolve())
+
+    def test_workspace_refuses_edited_memory_rule(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            rule = workspace / ".cursor" / "rules" / "worklog-chat-memory.mdc"
+            rule.parent.mkdir(parents=True)
+            rule.write_text("local edits\n", encoding="utf-8")
+            with self.assertRaises(installer.InstallError):
+                installer.plan_install(
+                    "workspace",
+                    workspace,
+                    ROOT,
+                    migrate_legacy=True,
+                )
+            self.assertEqual(rule.read_text(encoding="utf-8"), "local edits\n")
+
+    def test_workspace_updates_managed_claude_file_only(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            claude = workspace / "CLAUDE.md"
+            claude.write_text(
+                installer.CLAUDE_MARKER + " old -->\nold\n",
+                encoding="utf-8",
+            )
+            actions = self.install_workspace(workspace)
+            statuses = {
+                Path(item["target"]).name: item["status"] for item in actions
+            }
+            self.assertEqual(statuses["CLAUDE.md"], "update")
+            self.assertEqual(
+                claude.read_text(encoding="utf-8"),
+                (ROOT / "harness" / "claude" / "CLAUDE.md").read_text(
+                    encoding="utf-8"
+                ),
+            )
+            claude.write_text("# Team notes\n", encoding="utf-8")
+            with self.assertRaises(installer.InstallError):
+                installer.plan_install(
+                    "workspace",
+                    workspace,
+                    ROOT,
+                    migrate_legacy=True,
+                )
+            self.assertEqual(claude.read_text(encoding="utf-8"), "# Team notes\n")
+
+    def test_user_scope_migration_installs_workspace_rules(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            actions, hooks, path = installer.plan_legacy_removal(workspace, ROOT)
+            installer.apply_install(actions, hooks, path)
+            installer.verify_legacy_removal(actions, path)
+            rules = workspace / ".cursor" / "rules"
+            self.assertTrue((rules / "worklog-chat-memory.mdc").is_symlink())
+            self.assertTrue((rules / "git-handoff-governance.mdc").is_symlink())
+            self.assertTrue(
+                (workspace / "CLAUDE.md")
+                .read_text(encoding="utf-8")
+                .startswith(installer.CLAUDE_MARKER)
+            )
 
     def test_migrates_legacy_workspace_hooks(self):
         with tempfile.TemporaryDirectory() as directory:
