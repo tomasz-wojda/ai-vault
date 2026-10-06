@@ -145,7 +145,7 @@ Credential file naming is covered by "Credential File Format" above.
 | New Relic | `newrelic/` | `newrelic.properties` (profile-scoped sections) | `ai-worklog service newrelic` (27 actions) | Monitoring investigations. 19 read-only; 8 accept `--apply` and are dry-run without it (`dashboard-export` plus 7 create/update mutations) |
 | AWS | `aws/` | Profile files (export AWS_PROFILE=...) | — | One file per account/role (cue-stage, cue-prod, konto-prod) |
 | EKS | `eks/` | Context files (export KUBECONFIG=... or context name) | — | One file per cluster (konto, cue) |
-| Jenkins | `jenkins/` | `jenkins.properties` or `credentials` | `ai-worklog service jenkins` (15 actions) | Controller, job, build and plugin inspection. 14 read-only; only `download-artifact` accepts `--apply`. `syntax-check` runs this repo's own `syntax_check.sh` |
+| Jenkins | `jenkins/` | `jenkins.properties` or `credentials` | `ai-worklog service jenkins` (17 actions) | Controller, job, build and plugin inspection. 14 read-only; `download-artifact` and `job-export` write locally with `--apply`; `run-script` executes Groovy on controllers with `run_scripts=true` only with `--apply`. `syntax-check` runs this repo's own `syntax_check.sh` |
 | GitHub | `github/` | `github.properties` or `credentials` (GH_TOKEN) | — | gh CLI, API calls |
 | Argo CD | `argocd/` | `credentials` (ARGOCD_SERVER, ARGOCD_AUTH_TOKEN) | — | GitOps sync status |
 | Artifactory | `artifactory/` | `artifactory.properties`, `credentials`, or `creds` | `ai-worklog service artifactory` (7 read-only actions) | Profiles, status, protected access checks, repository and artifact listing, metadata, bounded text manifests |

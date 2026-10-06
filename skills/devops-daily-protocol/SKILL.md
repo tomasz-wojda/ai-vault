@@ -1,6 +1,6 @@
 ---
 name: devops-daily-protocol
-version: "1.1.6"
+version: "1.1.7"
 description: >-
   Orchestrates daily DevOps operations: pulling JIRA tickets, selecting work items,
   creating structured worklog files, integrating ai-worklog and New Relic monitoring,
@@ -122,13 +122,15 @@ exposing secrets.
 |-------|---------|---------|
 | Controller | `controllers`, `health`, `whoami`, `nodes`, `queue` | Controller inventory, operating mode, authenticated identity, executor and queue state |
 | Jobs | `jobs`, `job`, `seed`, `views` | Job listing and filtering, one job's status and recent builds, seed-job result, views |
-| Builds | `artifacts`, `download-artifact` | Artifacts of a selected build; download one by exact relative path |
+| Builds | `artifacts`, `download-artifact`, `job-export` | Artifacts of a selected build; download one by exact relative path; export a job's `config.xml` |
 | Config | `plugins`, `credentials`, `credential-domains` | Installed plugins and required-plugin verification, credential metadata, credential domains |
 | Validation | `syntax-check <files...>` | Validate scripted Jenkinsfiles |
+| Script | `run-script` | Run Groovy in the Script Console from a file, stdin (`-`) or `--script` |
 
-Fourteen read actions are always allowed under RESEARCH. Only
-`download-artifact` accepts `--apply`; it is dry-run without it and writes to
-the workspace, so it requires Write Gate approval. `credentials` and
+Fourteen read actions are always allowed under RESEARCH. `download-artifact`,
+`job-export` and `run-script` are dry-run without `--apply` and need Write Gate
+approval; `run-script` runs with full controller privileges, only where
+`jenkins.properties` sets `<id>.run_scripts=true`. `credentials` and
 `credential-domains` return metadata only — never secret values.
 
 `syntax-check` is not a second implementation. The framework resolves and runs
