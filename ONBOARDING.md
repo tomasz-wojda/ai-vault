@@ -44,8 +44,8 @@ directives whose failure causes damage.
 
 Initialize or reconcile a workspace with:
 ```
-ai-worklog workspace init /path/to/workspace
-ai-worklog workspace init /path/to/workspace --apply
+ai-worklog workspace apply /path/to/workspace --dry-run
+ai-worklog workspace apply /path/to/workspace
 ai-worklog --workspace /path/to/workspace preflight
 ```
 
@@ -307,7 +307,8 @@ Transition only on explicit `MODE: <name>` from user.
 ### Tool Paths Not Found
 
 Skills reference `integrations/<service>/`. If the workspace still has service
-folders at its root, preview and apply `ai-worklog workspace init <workspace>`.
+folders at its root, preview and apply `ai-worklog workspace apply <workspace>`,
+then move each service's credential files into `integrations/<service>/`.
 Verify with `ls -l <workspace>/integrations/`.
 
 ### AI Worklog Preflight Is Blocked

@@ -31,7 +31,8 @@ not resolve.
   `skills/worklog-chat-memory/references/journal-writer-contract.json`, using
   exact user text and exact final assistant response text. Write the payload
   with the Write tool and run
-  `skills/worklog-chat-memory/scripts/record_turn.py`, which appends the same
+  `repos/ai-vault/skills/worklog-chat-memory/scripts/record_turn.py` from the
+  workspace root, which appends the same
   current `prompt.log` audit entry only after a successful write. Never put
   conversational text in a shell command, `printf`, or heredoc. If
   `record-event` fails, leave the failure visible and do not append
@@ -75,7 +76,8 @@ regression-testing obligations: `skills/developer-protocol/SKILL.md`.
 - A skill's frontmatter `name` must equal its directory name, or no host will
   resolve it. Bump `version` per `VERSIONING.md` when changing a skill.
 - Skill tool paths target `integrations/<service>/`. If a workspace predates
-  that layout, run `ai-worklog workspace init <workspace>`.
+  that layout, run `ai-worklog workspace apply <workspace>` and move each
+  service's credential files into `integrations/<service>/`.
 
 ## Debugging
 

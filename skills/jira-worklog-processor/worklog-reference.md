@@ -101,12 +101,14 @@ A workspace may predate this layout, with service folders sitting directly at th
 workspace root (`jira/`, `newrelic/`, …). Migrate with:
 
 ```
-ai-worklog workspace init <workspace>
-ai-worklog workspace init <workspace> --apply
+ai-worklog workspace apply <workspace> --dry-run
+ai-worklog workspace apply <workspace>
 ```
 
-Initialization creates runtime directories and places symlinks under
-`integrations/` without moving service data or overwriting existing targets.
+`apply` creates the runtime directories and an empty `integrations/<service>/`
+directory per service. It never moves service data or overwrites existing
+targets, so move each service's credential files from the root folder into
+`integrations/<service>/` by hand.
 
 ### Structured Ticket State
 
@@ -136,7 +138,7 @@ paste the contents into a worklog.
 ### Service Inventory
 
 The canonical set is defined by `services` in the framework's
-`shared/workspace-init.json`; `ai-worklog workspace init` creates exactly these.
+`shared/workspace-init.json`; `ai-worklog workspace apply` creates exactly these.
 Credential file naming is covered by "Credential File Format" above.
 
 | Service | Folder | Credentials | Operator | Notes |

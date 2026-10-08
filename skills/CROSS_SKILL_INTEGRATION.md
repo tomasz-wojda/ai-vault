@@ -89,7 +89,7 @@ wins when two of them collide.
 ### 2.4 Pipeline Work — owner `jenkins-pipeline-architect`
 
 - **R-15** Pipeline code is written only in EXECUTE. Creation and modification both pass through PLAN first, including single-line changes and CPS refactoring.
-- **R-16** `scripts/syntax_check.sh` runs after every pipeline edit and is mandatory; failure reverts to PLAN per R-02. `ai-worklog service jenkins syntax-check` is a front end to that same script, not a second implementation, so either entry point discharges this rule. It validates Groovy grammar only, so a pass does not mean the pipeline works — that limitation belongs in the ACTION LOG. The wrapper resolves a JDK at or below the `MAX_JDK` ceiling set in that script; invoking `syntax_check.groovy` directly under a newer JDK fails with `Unsupported class file major version <N>`.
+- **R-16** `skills/jenkins-pipeline-architect/scripts/syntax_check.sh` runs after every pipeline edit and is mandatory; failure reverts to PLAN per R-02. `ai-worklog service jenkins syntax-check` is a front end to that same script, not a second implementation, so either entry point discharges this rule. It validates Groovy grammar only, so a pass does not mean the pipeline works — that limitation belongs in the ACTION LOG. The wrapper resolves a JDK at or below the `MAX_JDK` ceiling set in that script; invoking `syntax_check.groovy` directly under a newer JDK fails with `Unsupported class file major version <N>`.
 - **R-17** A `vars/*.groovy` change affects every consumer of the shared library and requires regression coverage for all of them within the same change.
 
 ### 2.5 Framework Integration — owner `ai-worklog-framework`
@@ -196,7 +196,7 @@ Mitigation then follows the mode sequence from INNOVATE onward.
 | `ticket-pickup.prompt` | `jira-worklog-processor` | User-maintained | `jira-worklog-processor` |
 | `.ai-worklog/state/<KEY>.json` | `ai-worklog-framework` schema | `devops-daily-protocol` through Write Gates | Daily, delivery, and closeout reports |
 | `.ai-worklog/evidence/*` | `ai-worklog-framework` | Runtime workspace | Investigation and delivery routines |
-| `.ai-worklog/config.json` | User/workspace | `ai-worklog workspace init` | Framework commands |
+| `.ai-worklog/config.json` | User/workspace | `ai-worklog workspace apply` | Framework commands |
 | `syntax_check.groovy` | `jenkins-pipeline-architect` | `jenkins-pipeline-architect` | `jenkins-pipeline-architect` |
 | `tmp/<KEY>/` | `jira-worklog-processor` | `jira-worklog-processor` | All skills |
 | Jenkinsfiles | `jenkins-pipeline-architect` | Workspace/SCM | `jenkins-pipeline-architect` |
@@ -288,7 +288,7 @@ When a user prompt is received, evaluate in sequence:
 | Tempo API 429 Rate Limited | `devops-daily-protocol` | Wait 60 seconds, retry with exponential backoff (max 3 attempts). |
 | New Relic operator returns no data | `devops-daily-protocol` | Log "No NR data available" in FINDINGS. Suggest manual NR UI check. |
 | `gh` CLI not authenticated | `jira-worklog-processor` | PR review workflow fails gracefully. Log error, suggest `gh auth login`. |
-| `syntax_check` JDK error | `jenkins-pipeline-architect` | JDK newer than the script's `MAX_JDK` ceiling. Suggest running `scripts/syntax_check.sh`, or setting `JAVA_HOME` to an install at or below it. |
+| `syntax_check` JDK error | `jenkins-pipeline-architect` | JDK newer than the script's `MAX_JDK` ceiling. Suggest running `skills/jenkins-pipeline-architect/scripts/syntax_check.sh`, or setting `JAVA_HOME` to an install at or below it. |
 | Artifactory Storage API timeout | `jenkins-pipeline-architect` | Active Choice parameter returns fallback: `["ERROR: timeout", "1.0.0"]`. |
 
 ### 5.4 Prompt.log Conflicts

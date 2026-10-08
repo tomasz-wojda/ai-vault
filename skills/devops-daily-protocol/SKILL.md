@@ -1,6 +1,6 @@
 ---
 name: devops-daily-protocol
-version: "1.1.8"
+version: "1.2.0"
 description: >-
   Orchestrates daily DevOps operations: pulling JIRA tickets, selecting work items,
   creating structured worklog files, integrating ai-worklog and New Relic monitoring,
@@ -44,108 +44,28 @@ credentials file and, where applicable, its operator configuration. See
 [worklog-reference.md](../jira-worklog-processor/worklog-reference.md) § "Interface Directory"
 for the full service inventory.
 
-### JIRA CLI
-**Path**: `ai-worklog service jira`
+### Service Operators
 
-| Mode | Command | Purpose |
-|------|---------|---------|
-| summary | `ai-worklog service jira summary` | Board overview: in-progress, blocked, to-do, recently completed |
-| ticket | `ai-worklog service jira ticket <KEY>` | Full ticket detail: fields, description, comments, links, worklogs, assignment |
-| rejected | `ai-worklog service jira rejected` | List rejected (Odrzucone) tickets |
-| reporter | `ai-worklog service jira reporter <DISPLAY-NAME>` | Tickets created by one reporter |
-| tempo | `ai-worklog service jira tempo [YYYY-MM-DD]` | Daily Tempo timesheet entries (defaults to today) |
-| verify | `ai-worklog service jira verify [YYYY-MM-DD]` | Compare local worklog/ files against Tempo entries |
-| whoami | `ai-worklog service jira whoami` | Validate Jira identity and authentication |
-| log-time | `ai-worklog service jira log-time <KEY> <DATE> <SECONDS> <COMMENT>` | Preview or apply a Tempo worklog |
+| Operator | Path | Read actions | Write Gate actions (`--apply`) |
+|----------|------|--------------|--------------------------------|
+| Jira, Tempo, Assets | `ai-worklog service jira` | `summary`, `ticket`, `rejected`, `reporter`, `tempo`, `verify`, `whoami`, `assets-schemas`, `assets-types`, `assets-attributes`, `assets-object`, `assets-search`, `get-ci`, `get-cis` | `log-time` |
+| New Relic | `ai-worklog service newrelic` | 19 reads, including `applications`, `violations`, `issues`, `nrql`, `entities`, `dashboards`, `alert-policies`, `alert-conditions` | `dashboard-export`, `alert-condition-create`/`-update`, `dashboard-create`, `dashboard-page-create`/`-update`, `dashboard-widget-create`/`-update` |
+| Automox | `ai-worklog service automox` | 14 reads, including `devices`, `policies`, `activity`, `patch-summary` | `policy-run`, `worklet-create`, `policy-delete`, `device-move`, `policy-add-group` |
+| Jenkins | `ai-worklog service jenkins` | 14 reads, including `controllers`, `job`, `artifacts`, `plugins`, `syntax-check` | `download-artifact`, `job-export`, `run-script` |
+| Artifactory | `ai-worklog service artifactory` | All 7 actions are read-only | — |
 
-### New Relic Operator
-**Path**: `ai-worklog service newrelic`
-
-**Credentials**: `integrations/newrelic/newrelic.properties` with profile-scoped
-keys. Existing `PROFILE.newrelic.*`, canonical `PROFILE.api_key` /
-`PROFILE.account_id`, and legacy unprefixed keys remain
-compatible. Select a profile with `--profile` or `NEW_RELIC_PROFILE`.
-
-| Action | Command | Purpose |
-|------|---------|---------|
-| profiles | `ai-worklog service newrelic profiles` | List configured profiles without exposing key values |
-| auth-test | `ai-worklog service newrelic auth-test` | Validate API key and account |
-| applications | `ai-worklog service newrelic applications [--query TEXT]` | APM application inventory |
-| application | `ai-worklog service newrelic application <APP_ID>` | Single application detail |
-| hosts | `ai-worklog service newrelic hosts <APP_ID>` | Hosts for an application |
-| deployments | `ai-worklog service newrelic deployments <APP_ID>` | Deployment history for an application |
-| violations | `ai-worklog service newrelic violations` | Legacy open alert violations |
-| issues | `ai-worklog service newrelic issues [--state STATE]` | NerdGraph AI issues |
-| alert-conditions | `ai-worklog service newrelic alert-conditions [--policy ID] [--query TEXT]` | Alert condition inventory |
-| nrql | `ai-worklog service newrelic nrql "<QUERY>"` or `--file PATH` | Arbitrary NRQL through NerdGraph |
-
-Nineteen read actions are always allowed under RESEARCH. Eight actions accept
-`--apply` and are dry-run without it — the seven create/update mutations plus
-`dashboard-export`, which writes to the workspace — and each requires Write Gate
-approval. Delete operations and host-side infra mutations are outside this
-operator.
-
-### Automox Operator
-**Path**: `ai-worklog service automox`
-
-**Credentials**: `integrations/automox/automox.properties` with profile-scoped
-keys, alongside `token` and `server-id`. Select a profile with `--profile`.
-
-| Action | Command | Purpose |
-|------|---------|---------|
-| profiles | `ai-worklog service automox profiles` | List configured profiles without exposing key values |
-| auth-test | `ai-worklog service automox auth-test` | Validate the API token |
-| orgs | `ai-worklog service automox orgs` | Accessible organizations |
-| groups | `ai-worklog service automox groups [--query TEXT]` | Server group inventory |
-| devices | `ai-worklog service automox devices [--group ID]` | Device inventory with group, name, connection filters |
-| device | `ai-worklog service automox device <ID-or-HOSTNAME>` | Single device detail |
-| device-packages | `ai-worklog service automox device-packages <ID>` | Packages on one device, filterable by state |
-| activity | `ai-worklog service automox activity` | Events within a date range |
-| patch-summary | `ai-worklog service automox patch-summary` | Patch activity summary for a date range |
-| policies | `ai-worklog service automox policies [--query TEXT]` | Policy inventory |
-| policy-stats | `ai-worklog service automox policy-stats` | Policy execution statistics |
-| device-queue | `ai-worklog service automox device-queue <ID>` | Command queue for one device |
-
-Fourteen read actions are always allowed under RESEARCH. Five actions accept
-`--apply` and are dry-run without it — `policy-run`, `worklet-create`,
-`policy-delete`, `device-move` and `policy-add-group` — and each requires Write
-Gate approval. `policy-delete` additionally requires `--confirm-name` to match.
-
-### Jenkins Operator
-**Path**: `ai-worklog service jenkins`
-
-**Credentials**: `integrations/jenkins/jenkins.properties` or `credentials`.
-Controllers are named in configuration; `controllers` lists them without
-exposing secrets.
-
-| Group | Actions | Purpose |
-|-------|---------|---------|
-| Controller | `controllers`, `health`, `whoami`, `nodes`, `queue` | Controller inventory, operating mode, authenticated identity, executor and queue state |
-| Jobs | `jobs`, `job`, `seed`, `views` | Job listing and filtering, one job's status and recent builds, seed-job result, views |
-| Builds | `artifacts`, `download-artifact`, `job-export` | Artifacts of a selected build; download one by exact relative path; export a job's `config.xml` |
-| Config | `plugins`, `credentials`, `credential-domains` | Installed plugins and required-plugin verification, credential metadata, credential domains |
-| Validation | `syntax-check <files...>` | Validate scripted Jenkinsfiles |
-| Script | `run-script` | Run Groovy in the Script Console from a file, stdin (`-`) or `--script` |
-
-Fourteen read actions are always allowed under RESEARCH. `download-artifact`,
-`job-export` and `run-script` are dry-run without `--apply` and need Write Gate
-approval; `run-script` runs with full controller privileges, only where
-`jenkins.properties` sets `<id>.run_scripts=true`. `credentials` and
-`credential-domains` return metadata only — never secret values.
-
-`syntax-check` is not a second implementation. The framework resolves and runs
-this repo's own `skills/jenkins-pipeline-architect/scripts/syntax_check.sh`,
-preferring a configured `syntax_check_script`, then `ai_vault_root`, then a
-resolved vault root. It reports BLOCKED when that script cannot be found. Either
-entry point therefore applies the same grammar check and the same `MAX_JDK`
-ceiling; use whichever is at hand and satisfy R-16 once.
+Full command tables, credential locations, and per-operator rules live in
+[references/service-operators.md](references/service-operators.md). Before using
+an action you have not used in this session, run
+`ai-worklog help --json service <name> <action>` for its exact positionals,
+options, and validation; never guess flags.
 
 ### Monitoring References
 - **kubectl patterns**: `integrations/eks/monitor_commands.txt` — read this file for cluster diagnostic commands
 - **Worklog template**: `skills/jira-worklog-processor/worklog.template` — structure for worklog files (managed by sibling skill `jira-worklog-processor`)
 
 ### AI Worklog CLI
-- `ai-worklog workspace init <path>` — preview workspace initialization; add `--apply` only after a Write Gate
+- `ai-worklog workspace apply <path> --dry-run` — preview workspace setup; run it without `--dry-run` only after a Write Gate
 - `ai-worklog preflight [--ticket <KEY>] [--service <SERVICE>...]` — environment readiness
 - `ai-worklog ticket prepare <KEY>` — worklogs, catalog, repositories, PRs, and delivery path
 - `ai-worklog state ...` — validated local structured state; mutations require dry-run preview and Write Gate
@@ -206,7 +126,7 @@ Steps:
    binaries, authentication, and connectivity
 2. Report any BLOCKED or DEGRADED services
 3. If ticket-scoped, run `ai-worklog preflight --ticket <TICKET-KEY>`
-4. For a new workspace, preview `ai-worklog workspace init <path>` and use a Write Gate before `--apply`
+4. For a new workspace, preview `ai-worklog workspace apply <path> --dry-run` and use a Write Gate before applying
 
 ### ROUTINE: Day Start
 Trigger: user starts work, asks "what should I work on", or requests ticket overview.
