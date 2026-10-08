@@ -1452,6 +1452,45 @@ class InstallerTest(unittest.TestCase):
                 )
             self.assertEqual(rule.read_text(encoding="utf-8"), "local edits\n")
 
+    def test_workspace_rules_mode_installs_rules_without_hooks(self):
+        script = ROOT / "scripts" / "install-cursor-harness.py"
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            preview = subprocess.run(
+                [sys.executable, str(script), "--workspace-rules", str(workspace)],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            planned = json.loads(preview.stdout)["actions"]
+            self.assertEqual({item["status"] for item in planned}, {"create"})
+            self.assertFalse((workspace / "AGENTS.md").exists())
+            subprocess.run(
+                [sys.executable, str(script), "--workspace-rules", str(workspace), "--apply"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            self.assertTrue((workspace / "AGENTS.md").is_symlink())
+            self.assertTrue((workspace / ".cursor" / "rules" / "worklog-chat-memory.mdc").is_symlink())
+            self.assertFalse((workspace / ".cursor" / "hooks.json").exists())
+            repeated = json.loads(subprocess.run(
+                [sys.executable, str(script), "--workspace-rules", str(workspace)],
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout)["actions"]
+            self.assertEqual({item["status"] for item in repeated}, {"unchanged"})
+            (workspace / "AGENTS.md").unlink()
+            (workspace / "AGENTS.md").write_text("# Team\n", encoding="utf-8")
+            refused = subprocess.run(
+                [sys.executable, str(script), "--workspace-rules", str(workspace)],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(refused.returncode, 2)
+            self.assertIn("refusing to replace", json.loads(refused.stdout)["error"])
+
     def test_workspace_refuses_unrelated_agents_file(self):
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory)

@@ -125,7 +125,9 @@ repository ships at its root.
 workspace `.rules` and `AGENTS.md` to this repository's `.rules`, and write the
 workspace `CLAUDE.md` from `harness/claude/CLAUDE.md`, so Cursor and Claude Code
 load the same workspace rules. Cursor reads `AGENTS.md` and `.cursor/rules/*.mdc`
-but not `.rules`; Claude Code reads `CLAUDE.md`, which imports `.rules`. An existing file is replaced only when it is
+but not `.rules`; Claude Code reads `CLAUDE.md`, which imports `.rules`. `--workspace-rules <workspace> [--apply]` installs only
+these workspace rule files without touching hooks; `ai-worklog workspace apply`
+runs it automatically. An existing file is replaced only when it is
 identical to the managed copy or carries the managed `CLAUDE.md` marker.
 
 ## Validation

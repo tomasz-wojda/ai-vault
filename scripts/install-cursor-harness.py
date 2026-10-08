@@ -264,6 +264,28 @@ def plan_install(
     return actions, merged, hooks_path
 
 
+def plan_workspace_rules(workspace: Path, vault: Path) -> list[dict]:
+    rule_dir = workspace / ".cursor" / "rules"
+    actions = [
+        link_action(vault / "harness" / "cursor" / "rules" / source_name, rule_dir / target_name)
+        for target_name, source_name in RULE_LINKS.items()
+    ]
+    actions.extend(workspace_rule_actions(vault, workspace))
+    return actions
+
+
+def verify_workspace_rules(actions: list[dict]) -> None:
+    for action in actions:
+        target = Path(action["target"])
+        if action["kind"] == "symlink":
+            if not target.is_symlink() or not target.resolve().is_file():
+                raise InstallError(f"installed link is invalid: {target}")
+        if action["kind"] == "file":
+            expected = Path(action["source"]).read_text(encoding="utf-8")
+            if target.read_text(encoding="utf-8") != expected:
+                raise InstallError(f"installed file is outdated: {target}")
+
+
 def plan_legacy_removal(
     workspace: Path,
     vault: Path,
@@ -316,7 +338,8 @@ def apply_install(actions: list[dict], hooks: dict, hooks_path: Path) -> None:
         if action["kind"] == "grace-marker" and action["status"] == "create":
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text("pending\n", encoding="utf-8")
-    if next(item for item in actions if item["kind"] == "json")["status"] == "update":
+    hooks_action = next((item for item in actions if item["kind"] == "json"), None)
+    if hooks_action and hooks_action["status"] == "update":
         hooks_path.parent.mkdir(parents=True, exist_ok=True)
         temporary = hooks_path.with_suffix(".tmp")
         temporary.write_text(
@@ -405,6 +428,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--migrate-workspace",
         help="Remove managed legacy ai-vault hooks from this workspace.",
     )
+    parser.add_argument(
+        "--workspace-rules",
+        help="Install only the workspace rule files: Cursor rules, .rules, AGENTS.md, and CLAUDE.md.",
+    )
     parser.add_argument("--apply", action="store_true")
     parser.add_argument(
         "--migrate-legacy",
@@ -414,8 +441,36 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def run_workspace_rules(workspace: Path, apply: bool) -> int:
+    vault = Path(__file__).resolve().parents[1]
+    try:
+        if not workspace.is_dir():
+            raise InstallError(f"workspace not found: {workspace}")
+        actions = plan_workspace_rules(workspace, vault)
+        if apply:
+            apply_install(actions, {}, workspace / ".cursor" / "hooks.json")
+            verify_workspace_rules(actions)
+        print(
+            json.dumps(
+                {
+                    "apply": apply,
+                    "scope": "workspace-rules",
+                    "workspace": str(workspace),
+                    "actions": actions,
+                },
+                indent=2,
+            )
+        )
+        return 0
+    except InstallError as exc:
+        print(json.dumps({"error": str(exc)}))
+        return 2
+
+
 def main() -> int:
     args = build_parser().parse_args()
+    if args.workspace_rules:
+        return run_workspace_rules(Path(args.workspace_rules).resolve(), args.apply)
     workspace = Path(args.workspace).resolve() if args.workspace else None
     scope = args.scope or ("workspace" if workspace else "user")
     vault = Path(__file__).resolve().parents[1]
