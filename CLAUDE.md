@@ -1,7 +1,8 @@
 # CLAUDE.md
 
-Claude Code equivalent of `.rules` (which Claude Code does not read). Cursor and
-AntiGravity consume `.rules`; Claude Code consumes this file.
+Claude Code equivalent of `.rules` (which Claude Code does not read). AntiGravity
+consumes `.rules`, Cursor reads it through the workspace `AGENTS.md` link, and
+Claude Code consumes this file.
 
 The full rule set lives in `.rules` and is imported below. The directives restated
 here are the ones whose failure causes damage, so they hold even if the import does

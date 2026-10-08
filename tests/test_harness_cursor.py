@@ -1368,6 +1368,14 @@ class InstallerTest(unittest.TestCase):
             installer.verify_install(actions, path, ROOT, "workspace")
             self.assertEqual(memory_rule.read_text(encoding="utf-8"), "memory\n")
             self.assertTrue((rules / "worklog-chat-memory.mdc").is_symlink())
+            for name in (".rules", "AGENTS.md"):
+                link = workspace / name
+                self.assertTrue(link.is_symlink())
+                self.assertEqual(link.resolve(), (ROOT / ".rules").resolve())
+            self.assertIn(
+                "@.rules",
+                (workspace / "CLAUDE.md").read_text(encoding="utf-8"),
+            )
             self.assertEqual(
                 (workspace / "CLAUDE.md").read_text(encoding="utf-8"),
                 (ROOT / "harness" / "claude" / "CLAUDE.md").read_text(
@@ -1444,6 +1452,23 @@ class InstallerTest(unittest.TestCase):
                 )
             self.assertEqual(rule.read_text(encoding="utf-8"), "local edits\n")
 
+    def test_workspace_refuses_unrelated_agents_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            agents = workspace / "AGENTS.md"
+            agents.write_text("# Team instructions\n", encoding="utf-8")
+            with self.assertRaises(installer.InstallError):
+                installer.plan_install(
+                    "workspace",
+                    workspace,
+                    ROOT,
+                    migrate_legacy=True,
+                )
+            self.assertEqual(
+                agents.read_text(encoding="utf-8"),
+                "# Team instructions\n",
+            )
+
     def test_workspace_updates_managed_claude_file_only(self):
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory)
@@ -1482,6 +1507,8 @@ class InstallerTest(unittest.TestCase):
             rules = workspace / ".cursor" / "rules"
             self.assertTrue((rules / "worklog-chat-memory.mdc").is_symlink())
             self.assertTrue((rules / "git-handoff-governance.mdc").is_symlink())
+            self.assertTrue((workspace / "AGENTS.md").is_symlink())
+            self.assertTrue((workspace / ".rules").is_symlink())
             self.assertTrue(
                 (workspace / "CLAUDE.md")
                 .read_text(encoding="utf-8")

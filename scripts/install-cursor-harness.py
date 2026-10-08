@@ -33,6 +33,10 @@ RULE_LINKS = {
     "git-handoff-governance.mdc": "git-handoff-governance.mdc",
     "worklog-chat-memory.mdc": "worklog-chat-memory.mdc",
 }
+WORKSPACE_RULE_LINKS = {
+    ".rules": ".rules",
+    "AGENTS.md": ".rules",
+}
 CLAUDE_TEMPLATE = Path("harness") / "claude" / "CLAUDE.md"
 CLAUDE_MARKER = "<!-- Managed by repos/ai-vault/scripts/install-cursor-harness.py."
 
@@ -142,6 +146,15 @@ def link_action(source: Path, target: Path) -> dict:
     }
 
 
+def workspace_rule_actions(vault: Path, workspace: Path) -> list[dict]:
+    actions = [
+        link_action(vault / source_name, workspace / target_name)
+        for target_name, source_name in WORKSPACE_RULE_LINKS.items()
+    ]
+    actions.append(claude_action(vault, workspace))
+    return actions
+
+
 def claude_action(vault: Path, workspace: Path) -> dict:
     content = (vault / CLAUDE_TEMPLATE).read_text(encoding="utf-8")
     target = workspace / "CLAUDE.md"
@@ -215,7 +228,7 @@ def plan_install(
         for target_name, source_name in RULE_LINKS.items():
             source = vault / "harness" / "cursor" / "rules" / source_name
             actions.append(link_action(source, rule_dir / target_name))
-        actions.append(claude_action(vault, workspace))
+        actions.extend(workspace_rule_actions(vault, workspace))
     hooks_path = cursor / "hooks.json"
     current = load_json(hooks_path, {"version": 1, "hooks": {}})
     fragment = hook_fragment(vault, scope)
@@ -272,7 +285,7 @@ def plan_legacy_removal(
     for target_name, source_name in RULE_LINKS.items():
         source = vault / "harness" / "cursor" / "rules" / source_name
         actions.append(link_action(source, rule_dir / target_name))
-    actions.append(claude_action(vault, workspace))
+    actions.extend(workspace_rule_actions(vault, workspace))
     hooks_path = cursor / "hooks.json"
     current = load_json(hooks_path, {"version": 1, "hooks": {}})
     merged = remove_legacy_hook_entries(current)

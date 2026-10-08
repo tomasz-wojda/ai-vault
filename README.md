@@ -121,9 +121,11 @@ Claude Code does not read `.rules`; its equivalent is `CLAUDE.md`, which this
 repository ships at its root.
 
 `--migrate-workspace` and `--scope workspace` also link
-`harness/cursor/rules/*.mdc` into the workspace `.cursor/rules/` and write the
+`harness/cursor/rules/*.mdc` into the workspace `.cursor/rules/`, link the
+workspace `.rules` and `AGENTS.md` to this repository's `.rules`, and write the
 workspace `CLAUDE.md` from `harness/claude/CLAUDE.md`, so Cursor and Claude Code
-load the same workspace rules. An existing file is replaced only when it is
+load the same workspace rules. Cursor reads `AGENTS.md` and `.cursor/rules/*.mdc`
+but not `.rules`; Claude Code reads `CLAUDE.md`, which imports `.rules`. An existing file is replaced only when it is
 identical to the managed copy or carries the managed `CLAUDE.md` marker.
 
 ## Validation
