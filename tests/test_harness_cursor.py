@@ -1491,6 +1491,71 @@ class InstallerTest(unittest.TestCase):
             self.assertEqual(refused.returncode, 2)
             self.assertIn("refusing to replace", json.loads(refused.stdout)["error"])
 
+    def test_workspace_adopts_previous_managed_rule_copy(self):
+        relative = "harness/cursor/rules/git-handoff-governance.mdc"
+        commits = subprocess.run(
+            ["git", "-C", str(ROOT), "log", "--format=%H", "--", relative],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.split()
+        oldest = subprocess.run(
+            ["git", "-C", str(ROOT), "show", f"{commits[-1]}:{relative}"],
+            check=True,
+            capture_output=True,
+        ).stdout
+        self.assertNotEqual(oldest, (ROOT / relative).read_bytes())
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            rule = workspace / ".cursor" / "rules" / "git-handoff-governance.mdc"
+            rule.parent.mkdir(parents=True)
+            rule.write_bytes(oldest)
+            actions = self.install_workspace(workspace)
+            statuses = {Path(item["target"]).name: item["status"] for item in actions}
+            self.assertEqual(statuses["git-handoff-governance.mdc"], "adopt")
+            self.assertEqual(rule.resolve(), (ROOT / relative).resolve())
+
+    def test_workspace_relinks_rules_from_another_vault(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            other = base / "old-vault"
+            (other / "skills").mkdir(parents=True)
+            (other / "skills" / "manifest.json").write_text("{}", encoding="utf-8")
+            (other / "harness" / "cursor" / "rules").mkdir(parents=True)
+            old_rule = other / "harness" / "cursor" / "rules" / "git-handoff-governance.mdc"
+            old_rule.write_text("old\n", encoding="utf-8")
+            (other / ".rules").write_text("old rules\n", encoding="utf-8")
+            workspace = base / "workspace"
+            rules = workspace / ".cursor" / "rules"
+            rules.mkdir(parents=True)
+            (rules / "git-handoff-governance.mdc").symlink_to(old_rule)
+            (rules / "worklog-chat-memory.mdc").symlink_to(
+                base / "gone" / "harness" / "cursor" / "rules" / "worklog-chat-memory.mdc"
+            )
+            (workspace / ".rules").symlink_to(other / ".rules")
+            actions = self.install_workspace(workspace)
+            statuses = {Path(item["target"]).name: item["status"] for item in actions}
+            self.assertEqual(statuses["git-handoff-governance.mdc"], "relink")
+            self.assertEqual(statuses["worklog-chat-memory.mdc"], "relink")
+            self.assertEqual(statuses[".rules"], "relink")
+            self.assertEqual((workspace / ".rules").resolve(), (ROOT / ".rules").resolve())
+            self.assertEqual(
+                (rules / "worklog-chat-memory.mdc").resolve(),
+                (ROOT / "harness" / "cursor" / "rules" / "worklog-chat-memory.mdc").resolve(),
+            )
+
+    def test_workspace_refuses_rules_link_outside_a_vault(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            (base / "notes").mkdir()
+            (base / "notes" / ".rules").write_text("mine\n", encoding="utf-8")
+            workspace = base / "workspace"
+            workspace.mkdir()
+            (workspace / ".rules").symlink_to(base / "notes" / ".rules")
+            with self.assertRaises(installer.InstallError):
+                installer.plan_install("workspace", workspace, ROOT, migrate_legacy=True)
+            self.assertEqual((workspace / ".rules").resolve(), (base / "notes" / ".rules").resolve())
+
     def test_workspace_refuses_unrelated_agents_file(self):
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory)

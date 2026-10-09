@@ -127,8 +127,11 @@ workspace `CLAUDE.md` from `harness/claude/CLAUDE.md`, so Cursor and Claude Code
 load the same workspace rules. Cursor reads `AGENTS.md` and `.cursor/rules/*.mdc`
 but not `.rules`; Claude Code reads `CLAUDE.md`, which imports `.rules`. `--workspace-rules <workspace> [--apply]` installs only
 these workspace rule files without touching hooks; `ai-worklog workspace apply`
-runs it automatically. An existing file is replaced only when it is
-identical to the managed copy or carries the managed `CLAUDE.md` marker.
+runs it automatically. An existing file is replaced only when it is a
+link into another ai-vault clone at the same path, a dangling link to a
+`harness/` path, a byte-identical copy of the current or any previously
+committed version, or a `CLAUDE.md` carrying the managed marker. Anything else is
+refused and left untouched.
 
 ## Validation
 

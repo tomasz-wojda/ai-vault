@@ -5,7 +5,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
+from functools import lru_cache
 from pathlib import Path
 
 
@@ -122,6 +124,64 @@ def hook_fragment(vault: Path, scope: str) -> dict:
     return transformed
 
 
+def vault_relative_path(source: Path) -> tuple[Path, str] | None:
+    resolved = source.resolve()
+    for candidate in resolved.parents:
+        if (candidate / "skills" / "manifest.json").is_file():
+            return candidate, resolved.relative_to(candidate).as_posix()
+    return None
+
+
+@lru_cache(maxsize=None)
+def known_versions(vault: str, relative: str) -> frozenset[bytes]:
+    try:
+        commits = subprocess.run(
+            ["git", "-C", vault, "log", "--format=%H", "--follow", "--", relative],
+            check=True,
+            capture_output=True,
+        ).stdout.decode().split()
+    except (OSError, subprocess.CalledProcessError):
+        return frozenset()
+    versions = set()
+    for commit in commits:
+        shown = subprocess.run(
+            ["git", "-C", vault, "show", f"{commit}:{relative}"],
+            capture_output=True,
+        )
+        if shown.returncode == 0:
+            versions.add(shown.stdout)
+    return frozenset(versions)
+
+
+def is_previous_managed_copy(source: Path, target: Path) -> bool:
+    if not target.is_file() or target.is_symlink():
+        return False
+    content = target.read_bytes()
+    if content == source.read_bytes():
+        return True
+    located = vault_relative_path(source)
+    if located is None:
+        return False
+    vault, relative = located
+    return content in known_versions(str(vault), relative)
+
+
+def is_previous_managed_link(source: Path, target: Path) -> bool:
+    if not target.is_symlink():
+        return False
+    located = vault_relative_path(source)
+    if located is None:
+        return False
+    relative = located[1]
+    pointed = Path(os.path.normpath(target.parent / os.readlink(target)))
+    if not pointed.as_posix().endswith("/" + relative):
+        return False
+    other_vault = Path(pointed.as_posix()[: -len(relative) - 1])
+    if (other_vault / "skills" / "manifest.json").is_file():
+        return True
+    return not pointed.exists() and "/" in relative
+
+
 def link_action(source: Path, target: Path) -> dict:
     relative = os.path.relpath(source.resolve(), target.parent.resolve())
     if target.is_symlink() and os.readlink(target) == relative:
@@ -129,11 +189,9 @@ def link_action(source: Path, target: Path) -> dict:
     elif target.exists() or target.is_symlink():
         if managed_relative(source, target):
             status = "unchanged"
-        elif (
-            target.is_file()
-            and not target.is_symlink()
-            and target.read_bytes() == source.read_bytes()
-        ):
+        elif is_previous_managed_link(source, target):
+            status = "relink"
+        elif is_previous_managed_copy(source, target):
             status = "adopt"
         else:
             raise InstallError(f"refusing to replace {target}")
@@ -238,7 +296,7 @@ def plan_install(
     if migrate_legacy:
         merged = remove_legacy_hook_entries(merged)
     changed = any(
-        action["status"] in {"create", "adopt", "update"}
+        action["status"] in {"create", "adopt", "relink", "update"}
         for action in actions
     )
     changed = changed or merged != current
@@ -326,7 +384,7 @@ def plan_legacy_removal(
 def apply_install(actions: list[dict], hooks: dict, hooks_path: Path) -> None:
     for action in actions:
         target = Path(action["target"])
-        if action["kind"] == "symlink" and action["status"] in {"create", "adopt"}:
+        if action["kind"] == "symlink" and action["status"] in {"create", "adopt", "relink"}:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.unlink(missing_ok=True)
             target.symlink_to(action["relative"])
