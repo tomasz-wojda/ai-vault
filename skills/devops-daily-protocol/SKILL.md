@@ -1,6 +1,6 @@
 ---
 name: devops-daily-protocol
-version: "1.2.0"
+version: "1.2.1"
 description: >-
   Orchestrates daily DevOps operations: pulling JIRA tickets, selecting work items,
   creating structured worklog files, integrating ai-worklog and New Relic monitoring,
@@ -51,7 +51,7 @@ for the full service inventory.
 | Jira, Tempo, Assets | `ai-worklog service jira` | `summary`, `ticket`, `rejected`, `reporter`, `tempo`, `verify`, `whoami`, `assets-schemas`, `assets-types`, `assets-attributes`, `assets-object`, `assets-search`, `get-ci`, `get-cis` | `log-time` |
 | New Relic | `ai-worklog service newrelic` | 19 reads, including `applications`, `violations`, `issues`, `nrql`, `entities`, `dashboards`, `alert-policies`, `alert-conditions` | `dashboard-export`, `alert-condition-create`/`-update`, `dashboard-create`, `dashboard-page-create`/`-update`, `dashboard-widget-create`/`-update` |
 | Automox | `ai-worklog service automox` | 14 reads, including `devices`, `policies`, `activity`, `patch-summary` | `policy-run`, `worklet-create`, `policy-delete`, `device-move`, `policy-add-group` |
-| Jenkins | `ai-worklog service jenkins` | 14 reads, including `controllers`, `job`, `artifacts`, `plugins`, `syntax-check` | `download-artifact`, `job-export`, `run-script` |
+| Jenkins | `ai-worklog service jenkins` | 14 reads, including `controllers`, `job`, `artifacts`, `plugins`, `syntax-check` | `download-artifact`, `job-export`, `run-script`, `plugins install`, `safe-restart` (`admin_actions=true`) |
 | Artifactory | `ai-worklog service artifactory` | All 7 actions are read-only | — |
 
 Full command tables, credential locations, and per-operator rules live in
