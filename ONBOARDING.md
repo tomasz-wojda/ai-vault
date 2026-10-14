@@ -123,7 +123,7 @@ ai-vault/
 The bottom two are peer specialists, invoked by surface rather than stacked: one
 for Jenkins work, one for posting review comments. See
 `skills/CROSS_SKILL_INTEGRATION.md` § 1 for the layer contract and § 2 for the
-twenty-eight rules that govern the handoffs.
+twenty-nine rules that govern the handoffs.
 
 When multiple skills are active, `devops-daily-protocol` governs *when* and *how* to create/update files; `jira-worklog-processor` governs *what goes inside them*.
 

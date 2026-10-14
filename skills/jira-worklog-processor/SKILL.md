@@ -115,7 +115,7 @@ The file exists so new sessions can reference it as a startup instruction set. T
 
 ## Safety Rules
 
-All operations are **read-only by default**. Any write requires the Write Gate Protocol.
+All operations are **read-only by default**. Any write requires the Write Gate Protocol except ticket sync ([CROSS_SKILL_INTEGRATION.md](../CROSS_SKILL_INTEGRATION.md) R-29).
 
 Write operations: creating/editing files, HTTP POST/PUT/DELETE, git commits/pushes.
 Read operations (always allowed): JIRA CLI, New Relic operator reads, file reads, kubectl read-only.
@@ -275,7 +275,7 @@ Valid status labels: RESEARCH, INNOVATE, PLAN, EXECUTE, BLOCKED, PARKED, DONE
 
 ### Structured State
 
-Preview every `ai-worklog state` mutation, apply it only after a Write Gate, then
+Preview every `ai-worklog state` mutation, apply it only after a Write Gate or ticket sync (R-29), then
 run `ai-worklog delivery status <TICKET-KEY>`. Mirror material lifecycle changes
 into DELIVERY STATE and ACTION LOG. Never hand-edit `.ai-worklog/state/*.json`.
 

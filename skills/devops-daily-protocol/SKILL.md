@@ -1,6 +1,6 @@
 ---
 name: devops-daily-protocol
-version: "1.2.1"
+version: "1.3.0"
 description: >-
   Orchestrates daily DevOps operations: pulling JIRA tickets, selecting work items,
   creating structured worklog files, integrating ai-worklog and New Relic monitoring,
@@ -12,6 +12,7 @@ description: >-
 
 ## Safety Rules
 All operations are **read-only by default**. Any write operation requires the Write Gate Protocol (section below).
+Ticket sync ([CROSS_SKILL_INTEGRATION.md](../CROSS_SKILL_INTEGRATION.md) R-29) is the one exception: after a turn that touches a ticket with an active worklog, update that worklog and its existing structured state directly, in any mode, and end the response with a `Ticket sync:` line.
 
 Write operations include:
 - Creating or editing files (worklog files, raw logs)
@@ -108,7 +109,7 @@ This skill serves as the **operational lifecycle shell (Layer 2)** and orchestra
 
 3. **Governance by `developer-protocol` (Mode Control):**
    - Read operations (JIRA CLI, New Relic operator reads, kubectl) execute under `RESEARCH` mode.
-   - All Write Gate proposals (file updates, Tempo time logging, git operations) execute under `PLAN` / `EXECUTE` modes.
+   - All Write Gate proposals (file updates, Tempo time logging, git operations) execute under `PLAN` / `EXECUTE` modes; ticket sync (R-29) runs in any mode without a proposal.
 
 For the inter-layer rules (R-01..R-24), see [CROSS_SKILL_INTEGRATION.md](../CROSS_SKILL_INTEGRATION.md) § 2.
 
@@ -237,13 +238,13 @@ This routine tracks the progression from local implementation to live-verified d
 - Detect ArgoCD sync state (including false-positive Synced without live update)
 - Document manual operations not captured in PRs (forced syncs, seed runs)
 - Run verification commands from the service catalog
-- Preview structured changes with `ai-worklog state ...`; after Write Gate approval, apply them with `--apply`
+- Preview structured changes with `ai-worklog state ...`; after Write Gate approval, apply them with `--apply`; ticket sync (R-29) applies them directly
 - Run `ai-worklog delivery status <TICKET-KEY>` after mutations to reconcile lifecycle gaps
 
 **Updating worklog DELIVERY STATE section:**
-- Each delivery lifecycle change is a **WRITE GATE** — show proposed update before applying
+- Each delivery lifecycle change is a **WRITE GATE** — show proposed update before applying, unless applied by ticket sync (R-29)
 - Record the complete state including all repositories and environments
-- Structured JSON leads automation; mirror material state into the human worklog in a separate Write Gate
+- Structured JSON leads automation; mirror material state into the human worklog in a separate Write Gate or through ticket sync (R-29)
 
 ### ROUTINE: Ticket Done
 Trigger: user says ticket is done, finished, complete, or asks to log time.
@@ -278,7 +279,7 @@ Steps:
 5. Present daily summary: tickets worked on, total hours, any gaps
 
 ## Write Gate Protocol
-Every non-read operation MUST follow this protocol:
+Every non-read operation except ticket sync (R-29) MUST follow this protocol:
 
 1. **ANNOUNCE**: State the operation type clearly (e.g., "Creating worklog file", "Posting to Tempo API", "Moving files").
 2. **PREVIEW**: Show the intended change using these compact formats:

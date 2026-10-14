@@ -58,7 +58,7 @@ one, both, or neither.
 
 ## 2. Inter-Layer Rules
 
-Twenty-eight rules, grouped by the concern they govern. Each states a constraint
+Twenty-nine rules, grouped by the concern they govern. Each states a constraint
 that binds at decision time. The skill named as owner holds the canonical
 statement of the rule; this document fixes how the layers compose and which rule
 wins when two of them collide.
@@ -72,14 +72,14 @@ wins when two of them collide.
 
 ### 2.2 Write Routing — owner `devops-daily-protocol`
 
-- **R-05** Every write routes through the Write Gate: file creation and edits, HTTP POST/PUT/DELETE, git operations, Tempo submission, and `--apply` on any framework command. L3 worklog edits, L4 pipeline edits and L5 PR.log appends are not exempt.
-- **R-06** The gate's five steps map onto modes — ANNOUNCE, PREVIEW and WAIT belong to PLAN; EXECUTE and VERIFY belong to EXECUTE. User approval does not substitute for `MODE: EXECUTE`.
+- **R-05** Every write routes through the Write Gate: file creation and edits, HTTP POST/PUT/DELETE, git operations, Tempo submission, and `--apply` on any framework command. L3 worklog edits, L4 pipeline edits and L5 PR.log appends are not exempt. Ticket sync under R-29 is the only exception.
+- **R-06** The gate's five steps map onto modes — ANNOUNCE, PREVIEW and WAIT belong to PLAN; EXECUTE and VERIFY belong to EXECUTE. User approval does not substitute for `MODE: EXECUTE`. Ticket sync under R-29 skips PREVIEW and WAIT and runs in any mode.
 - **R-07** One gate is active at a time. A mode switch mid-gate cancels it, and the operation is re-evaluated in the new mode.
 - **R-08** Credential files are referenced by path and never read for their values, in any mode.
 
 ### 2.3 Worklog Content — owner `jira-worklog-processor`
 
-- **R-09** Mode gates the analytical sections only: FINDINGS in RESEARCH, PROPOSED SOLUTIONS in INNOVATE, PROPOSED ACTIONS in PLAN, ACTION LOG in EXECUTE. Structural sections — TICKET header, RELATED TICKET, REFERENCED REPOSITORIES, STATUS, TIME LOGGED, DELIVERY STATE — carry no mode restriction and are governed by R-05 alone. Ticket pickup therefore writes the header while in RESEARCH, and closeout writes TIME LOGGED and STATUS while in EXECUTE.
+- **R-09** Mode gates the analytical sections only: FINDINGS in RESEARCH, PROPOSED SOLUTIONS in INNOVATE, PROPOSED ACTIONS in PLAN, ACTION LOG in EXECUTE. Structural sections — TICKET header, RELATED TICKET, REFERENCED REPOSITORIES, STATUS, TIME LOGGED, DELIVERY STATE — carry no mode restriction and are governed by R-05 alone. Ticket pickup therefore writes the header while in RESEARCH, and closeout writes TIME LOGGED and STATUS while in EXECUTE. Ticket sync (R-29) may also append ACTION LOG entries in any mode.
 - **R-10** FINDINGS hold observations only. A fix identified during RESEARCH is held for INNOVATE rather than recorded as a finding.
 - **R-11** Output too large for the worklog goes to `worklog/YYYY-MM-DD_<KEY>_<suffix>_raw.log` and is referenced from FINDINGS by path. `_raw.log` files are excluded from `verify` scanning and Tempo correlation.
 - **R-12** A plan that modifies an existing script or tool must carry regression test steps for every existing command or feature it touches. Skipping is permitted only with a documented reason, such as execution exceeding 60 seconds.
@@ -96,13 +96,13 @@ wins when two of them collide.
 
 - **R-18** `ai-worklog preflight` runs at session start and `preflight --ticket <KEY>` at pickup. BLOCKED halts dependent operations; DEGRADED is reported and work continues.
 - **R-19** `ticket prepare` is the source of the worklog history, repositories, delivery paths and preparation gaps handed to L3.
-- **R-20** State mutations are previewed in PLAN, applied with `--apply` in EXECUTE, and verified read-only through `delivery status`. `.ai-worklog/state/*.json` is never hand-edited.
+- **R-20** State mutations are previewed in PLAN, applied with `--apply` in EXECUTE, and verified read-only through `delivery status`. `.ai-worklog/state/*.json` is never hand-edited. Ticket sync (R-29) applies its state commands directly in any mode.
 - **R-21** Structured JSON leads automation and the worklog leads narrative. Where the two contradict, the contradiction is surfaced rather than silently overwritten. Jira remains the authority on board state.
 - **R-22** `closeout report` precedes the Tempo and archival Write Gates. Evidence produced by `diag run` is redacted and referenced by bundle path from FINDINGS or ACTION LOG.
 
 ### 2.6 Precedence
 
-- **R-23** Where rules conflict, precedence runs safety, then mode, then content, then style. Concretely: the Write Gate's WAIT step is a safety requirement and is outside the scope of the `.rules` §5 prohibition on questions. A confirmation prompt before a write is mandatory regardless of response-style directives.
+- **R-23** Where rules conflict, precedence runs safety, then mode, then content, then style. Concretely: the Write Gate's WAIT step is a safety requirement and is outside the scope of the `.rules` §5 prohibition on questions. A confirmation prompt before a write is mandatory regardless of response-style directives, except for ticket sync under R-29.
 
 ### 2.7 Runtime Precondition
 
@@ -118,7 +118,11 @@ wins when two of them collide.
 
 - **R-28** After EXECUTE file changes, generate one commit handoff per Git repository changed during the current agent generation. Each handoff contains only attributed paths and exactly one `git -C ... add -- ...` command plus one `git -C ... commit` command with a semantic title and one continuous description. Unrelated pre-existing dirt is excluded. Read-only turns, clean repositories, and external-only operations produce no handoff.
 
-### 2.10 Composite Sequences
+### 2.10 Ticket Sync — owner `devops-daily-protocol`
+
+- **R-29** After a turn that touches a ticket with an active worklog — `worklog/*_<KEY>*.log` at the top level, not in `done/` — the agent updates that ticket's worklog and its existing structured state in any mode, without the Write Gate's PREVIEW and WAIT steps. Analytical sections keep the R-09 mode mapping; structural sections, OPEN DECISIONS, BLOCKERS, NEXT ACTION and one ACTION LOG entry may be written in any mode. State changes use `ai-worklog state ... --apply` only where `.ai-worklog/state/<KEY>.json` exists. The response ends with a `Ticket sync:` line naming each written section and applied state command, and VERIFY still applies. Worklog creation, `state init`, `closeout.*` state paths, TIME LOGGED, archival to `done/`, Tempo, `PR.log`, repository files and every external write stay fully gated. In Cursor the harness `stop` hook enforces the rule with one follow-up turn per generation for each touched key whose worklog was not edited.
+
+### 2.11 Composite Sequences
 
 The rules above compose into three recurring sequences. Each step names the
 owning layer.
@@ -392,3 +396,4 @@ CHECK 3: Is the Jenkinsfile a valid Groovy file?
 | 3.5 | 2026-09-11 | Added `pr-review-comments` as L5, a peer specialist to L4. New §2.8 with R-25..R-27, PR.log co-ownership in the artifact table, and an activation row. The skill had existed since 2026-09-11 with no layer, no rules and no mention here. |
 | 3.6 | 2026-09-21 | Extended L5 with concise production-ready comments, verified one-click suggested changes, and opt-in local remediation in corresponding repos clones without commits or pushes. |
 | 3.7 | 2026-09-23 | Added R-28: commit handoffs are generated once per repository and only for paths changed during the current agent generation. Clean and external-only work produces no Git commands. |
+| 3.8 | 2026-10-14 | Added R-29: ticket sync updates the active worklog and existing structured state after each turn without PREVIEW or WAIT, in any mode, enforced in Cursor by a harness stop hook. Amended R-05, R-06, R-09, R-20 and R-23 accordingly. |

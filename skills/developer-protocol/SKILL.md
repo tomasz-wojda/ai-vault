@@ -1,6 +1,6 @@
 ---
 name: developer-protocol
-version: "1.1.1"
+version: "1.2.0"
 description: Enforces a strict multi-mode workflow (RESEARCH, INNOVATE, PLAN, EXECUTE) to ensure codebase integrity and prevent unauthorized modifications.
 ---
 
@@ -58,6 +58,7 @@ When this skill is active, you must adhere to the following strict protocol to a
 - **General Notes:** - You are not permitted to act outside of these defined modes.
   - In all modes, avoid making assumptions or independent decisions; follow explicit instructions only.
   - If there is any uncertainty or if further clarification is needed, ask clarifying questions before proceeding.
+  - Ticket sync under CROSS_SKILL_INTEGRATION R-29 is permitted in every mode and is not implementation; it never extends to code, repository files, or external systems.
 
 ## Integration with Operational Skills
 
@@ -68,7 +69,7 @@ This skill acts as the **governance layer (Layer 1)** across all sibling skills:
   - `RESEARCH` mode aligns with Day Start and early Investigation Mode (read-only queries, NRQL, kubectl).
   - `INNOVATE` mode aligns with evaluating solution options before writing to worklogs.
   - `PLAN` mode aligns with constructing `PROPOSED ACTIONS` checklists in worklogs.
-  - `EXECUTE` mode aligns with running approved Write Gate operations.
+  - `EXECUTE` mode aligns with running approved Write Gate operations; ticket sync (R-29) runs in every mode.
 
 - **Overlay on `jira-worklog-processor`:**  
   Mode transitions govern when content sections in `worklog/` files may be populated (e.g. `FINDINGS` in `RESEARCH`, `PROPOSED SOLUTIONS` in `INNOVATE`, `PROPOSED ACTIONS` in `PLAN`).
