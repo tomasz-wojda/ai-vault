@@ -44,7 +44,7 @@ one, both, or neither.
 | **L2** | `devops-daily-protocol` | Tool contracts (JIRA CLI, New Relic operator, kubectl), Write Gate Protocol, prompt.log | When and how tools are invoked, safety enforcement |
 | **L3** | `jira-worklog-processor` | Worklog content patterns, worklog.template, PR.log, ticket-pickup.prompt | What goes inside worklog files, content quality |
 | **L4** | `jenkins-pipeline-architect` | Jenkinsfile patterns, CPS rules, syntax_check.groovy, postJiraComment | How CI/CD pipelines are structured and validated |
-| **L5** | `pr-review-comments` | Evidence bars, concise comment structure, severity calibration, suggested changes, local remediation, the `POSTED COMMENTS` and `NOT POSTED` blocks of PR.log | How a review finding is proven, worded and anchored on GitHub, and how an explicitly requested fix is prepared in the corresponding clone |
+| **L5** | `pr-review-comments` | Evidence bars, concise comment structure, severity calibration, suggested changes, the gated `APPROVE`/`REQUEST_CHANGES` review submission, local remediation, the `POSTED COMMENTS`, `NOT POSTED` and `SUBMITTED REVIEW` blocks of PR.log | How a review finding is proven, worded and anchored on GitHub, which review state follows from it, and how an explicitly requested fix is prepared in the corresponding clone |
 
 ### Inter-Layer Communication Rules
 
@@ -112,7 +112,7 @@ wins when two of them collide.
 
 - **R-25** A finding reaches the pull request only once it is proven by a read-only execution, bounded by a statement of what it cannot affect, and measured for how often it fires. A finding failing any of the three goes to chat, never to the PR. Evidence is never produced by mutating the target system; if a proof would require a write, say so and stop.
 - **R-26** One concise inline comment per defect, anchored to its line or contiguous line range at the pinned head SHA — re-fetched, since the author may have pushed. Use an applicable one-click suggested change when the complete replacement is addressable in the diff; use a plain replacement and name the limitation when required lines are outside the hunk. A defect recurring across non-contiguous regions is still one comment, not several. Top-level comments listing multiple findings are not used.
-- **R-27** L5 contributes the `POSTED COMMENTS` and `NOT POSTED` blocks to `PR.log`; L3 owns the entry format and L2 gates the append, so L5 never redefines the entry. Posting the comment is L5's only remote write to the pull request. Local remediation is opt-in, resolves and verifies the matching `<workspace>/repos/<owner>-<repository>` clone, and runs only through INNOVATE or PLAN followed by EXECUTE; it stages validated changes but never commits or pushes.
+- **R-27** L5 contributes the `POSTED COMMENTS`, `NOT POSTED` and `SUBMITTED REVIEW` blocks to `PR.log`; L3 owns the entry format and L2 gates the append, so L5 never redefines the entry. L5's only remote writes to the pull request are proven inline comments and one review per head SHA, submitted through its own Write Gate after every inline comment is verified: `APPROVE` when no Blocker or Regression is unresolved, `REQUEST_CHANGES` otherwise, and nothing — recorded as `WITHHELD` — when the review is incomplete, the head moved, prior evidence is unknown, a comment failed, permission is insufficient, or the reviewer authored the PR. Suspicions never affect the event. L5 never merges, dismisses reviews, or updates the branch. Local remediation is opt-in, resolves and verifies the matching `<workspace>/repos/<owner>-<repository>` clone, and runs only through INNOVATE or PLAN followed by EXECUTE; it stages validated changes but never commits or pushes.
 
 ### 2.9 Repository Commit Handoff — owner `developer-protocol`
 
@@ -139,8 +139,10 @@ rules and flags shared-library impact (R-17). L3 then takes two gated writes: th
 `PR.log` entry, and the checklist transition to `[~]` (R-13). Where the user asks
 for a finding to be raised on GitHub, L5 takes over: it proves the finding against
 the live system, anchors one comment per defect at the pinned head SHA (R-25,
-R-26), and contributes its `POSTED COMMENTS` and `NOT POSTED` blocks to the same
-`PR.log` entry (R-27). Review remains read-only. When the user explicitly asks
+R-26), verifies each comment, then submits one gated review whose event follows
+the most severe unresolved finding, and contributes its `POSTED COMMENTS`,
+`NOT POSTED` and `SUBMITTED REVIEW` blocks to the same `PR.log` entry (R-27).
+The analysis itself remains read-only. When the user explicitly asks
 for a local fix, L5 carries the proven finding through INNOVATE or PLAN and then
 EXECUTE, verifies the corresponding clone and remote, prepares a focused branch
 from the pinned PR head, validates and stages only the intended files, and
@@ -190,8 +192,9 @@ Mitigation then follows the mode sequence from INNOVATE onward.
 | `worklog/done/*` | (archived) | `devops-daily-protocol` | `jira-worklog-processor` (reopened check) |
 | `worklog/tickets.log` | `devops-daily-protocol` | `devops-daily-protocol` | All skills |
 | `prompt.log` | All skills (append-only) | `devops-daily-protocol` | All skills |
-| `PR.log` | `jira-worklog-processor` (entry format); `pr-review-comments` (`POSTED COMMENTS`, `NOT POSTED`, follow-up blocks) | `devops-daily-protocol` through Write Gates | All skills |
+| `PR.log` | `jira-worklog-processor` (entry format); `pr-review-comments` (`POSTED COMMENTS`, `NOT POSTED`, `SUBMITTED REVIEW`, follow-up blocks) | `devops-daily-protocol` through Write Gates | All skills |
 | GitHub PR review comments | `pr-review-comments` | GitHub | `pr-review-comments` (re-read rather than recalled) |
+| GitHub PR review state (`APPROVED`, `CHANGES_REQUESTED`) | `pr-review-comments` | GitHub, through a dedicated Write Gate | `pr-review-comments` (re-read rather than recalled) |
 | `worklog.template` | `jira-worklog-processor` | User-maintained | `jira-worklog-processor` |
 | `ticket-pickup.prompt` | `jira-worklog-processor` | User-maintained | `jira-worklog-processor` |
 | `.ai-worklog/state/<KEY>.json` | `ai-worklog-framework` schema | `devops-daily-protocol` through Write Gates | Daily, delivery, and closeout reports |

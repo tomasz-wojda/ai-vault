@@ -1,6 +1,6 @@
 ---
 name: jira-worklog-processor
-version: "1.1.9"
+version: "1.2.0"
 description: >-
   Process JIRA tickets into structured worklog files following a multi-phase
   research-first workflow. Extends devops-daily-protocol with content generation
@@ -298,14 +298,14 @@ Triggered by "review this PR", "review PR #N", or a GitHub PR URL.
 | Marker | Meaning | When applied |
 |--------|---------|--------------|
 | `[ ]` | Not started | Default at plan time |
-| `[~]` | In PR — diff covers this item, PR still open | PR review (step 9 below) |
+| `[~]` | In PR — diff covers this item, PR still open | PR review (step 10 below) |
 | `[x]` | Done — change landed | PR merged (see Merge Follow-up below) |
 
 Never mark `[x]` during review. Review marks covered items `[~]` only.
 
 ### Flow
 
-1. **Extract PR metadata** — use `gh pr view <URL-or-number> --json title,body,author,baseRefName,headRefName,files,reviews,reviewRequests,state`
+1. **Extract PR metadata** — use `gh pr view <URL-or-number> --json title,body,author,baseRefName,headRefName,headRefOid,files,reviews,reviewRequests,state`
 2. **Identify the ticket key** — parse from PR title, branch name, or body (patterns: `KD-1234`, `DEVOPS-123`, `CWP-1234`)
 3. **Find the worklog** — search `worklog/*_<TICKET-KEY>.log` and `worklog/done/*_<TICKET-KEY>.log`
 4. **Read the worklog** — extract PROPOSED ACTIONS / IMPLEMENTATION CHECKLIST / PROPOSED SOLUTIONS to understand what the PR *should* be doing
@@ -315,9 +315,10 @@ Never mark `[x]` during review. Review marks covered items `[~]` only.
    - Are there changes NOT in the plan? Flag as out-of-scope.
    - Are there checklist items NOT covered by the diff? Leave as `[ ]`, flag as missing.
 7. **Produce structured review output** — see format below
-8. **WRITE GATE**: Append entry to `PR.log`
-9. **WRITE GATE**: Update worklog PROPOSED ACTIONS — change matched `[ ]` items to `[~]`; append PR link on the same line
-10. **Update worklog ACTION LOG** — note the PR review with PR number, repo, outcome, count of `[~]` items
+8. **WRITE GATE**: Submit the review state through [pr-review-comments](../pr-review-comments/SKILL.md) steps 12–14 — `APPROVE` when no Blocker or Regression is unresolved, otherwise `REQUEST_CHANGES`; record `WITHHELD` when that skill's withhold conditions apply
+9. **WRITE GATE**: Append entry to `PR.log`
+10. **WRITE GATE**: Update worklog PROPOSED ACTIONS — change matched `[ ]` items to `[~]`; append PR link on the same line
+11. **Update worklog ACTION LOG** — note the PR review with PR number, repo, outcome, review state, count of `[~]` items
 
 ### Merge Follow-up
 
@@ -387,7 +388,7 @@ others. This is deliberate: a Helm chart bump and a Jenkinsfile
 refactor do not summarise the same way. Do not invent a section that duplicates
 `OBSERVATIONS`.
 
-**Appended by `pr-review-comments`** when findings were posted to GitHub. That
+**Appended by `pr-review-comments`** when findings or a review state reached GitHub. That
 skill owns the content of these blocks; this document fixes only their position,
 which is after `OBSERVATIONS`:
 
@@ -400,6 +401,9 @@ POSTED COMMENTS:
 
 NOT POSTED (kept in chat):
   - <finding> — <which evidence bar it failed>
+
+SUBMITTED REVIEW:
+  Event: APPROVE | REQUEST_CHANGES | WITHHELD   State: <state | none>   Head: <sha>
 
 POSTED COMMENTS FOLLOW-UP (YYYY-MM-DDTHH:MM):
   1. r<id> — suggestion applied in <sha>

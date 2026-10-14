@@ -1,18 +1,20 @@
 ---
 name: pr-review-comments
-version: "1.4.0"
+version: "1.5.0"
 description: >-
-  Author concise, evidence-backed GitHub PR review comments and prepare
-  validated local fixes in the corresponding repos clone. Use when the user
-  asks to comment on a PR, post a finding, create a suggested change, or fix a
-  proven review finding locally without committing or pushing.
+  Author concise, evidence-backed GitHub PR review comments, submit a gated
+  approve or request-changes review derived from the most severe finding, and
+  prepare validated local fixes in the corresponding repos clone. Use when the
+  user asks to comment on a PR, post a finding, create a suggested change,
+  approve or request changes, or fix a proven review finding locally without
+  committing or pushing.
 ---
 
 # PR Review Comments
 
-Covers **authoring and posting** review comments on a GitHub pull request and,
-when explicitly requested, preparing a validated fix in the corresponding
-workspace clone.
+Covers **authoring and posting** review comments on a GitHub pull request,
+**submitting the review state** that follows from them, and, when explicitly
+requested, preparing a validated fix in the corresponding workspace clone.
 
 For comparing a PR diff against a worklog plan and updating checklist markers,
 see [jira-worklog-processor](../jira-worklog-processor/SKILL.md) § "PR Review
@@ -50,9 +52,14 @@ not on the PR.
 - [ ] 9. Write the body to a file
 - [ ] 10. Post anchored to the line(s)
 - [ ] 11. Re-read and verify the posted comment
-- [ ] 12. Record what was posted in PR.log
-- [ ] 13. Report the permalink and fix status
+- [ ] 12. Resolve the review event from the most severe finding
+- [ ] 13. Write Gate the review submission
+- [ ] 14. Submit and verify the review
+- [ ] 15. Record what was posted in PR.log
+- [ ] 16. Report the permalinks, review state, and fix status
 ```
+
+Steps 3–11 run once per finding; skip them when the review found nothing.
 
 ## Workspace artifact storage
 
@@ -78,6 +85,8 @@ mkdir -p -- "$REVIEW_DIR"
 SOURCE_FILE="${REVIEW_DIR}/pr-${PR_NUMBER}-finding-${FINDING_NUMBER}-source.txt"
 COMMENT_FILE="${REVIEW_DIR}/pr-${PR_NUMBER}-finding-${FINDING_NUMBER}-comment.md"
 VERIFY_FILE="${REVIEW_DIR}/pr-${PR_NUMBER}-finding-${FINDING_NUMBER}-verification.json"
+REVIEW_BODY_FILE="${REVIEW_DIR}/pr-${PR_NUMBER}-review-body.md"
+REVIEW_VERIFY_FILE="${REVIEW_DIR}/pr-${PR_NUMBER}-review-verification.json"
 ```
 
 Run the block from the current ai-worklog workspace root and set `REVIEW_TOPIC`
@@ -256,7 +265,17 @@ gh api repos/<org>/<repo>/pulls/comments/<comment-id> \
 Do not call a comment a one-click suggestion unless the returned body contains
 a valid `suggestion` fence on an addressable diff line or contiguous range.
 
-### 12. Record what was posted in PR.log
+### 12–14. Submit the review state
+
+Follow [references/review-submission.md](references/review-submission.md).
+Unresolved Nit and Minor findings, or none, yield `APPROVE`; any unresolved
+Regression or Blocker yields `REQUEST_CHANGES`. Withhold on an incomplete
+review, a moved head, unknown prior evidence, a comment failure, insufficient
+permission, or a self-authored PR. The submission has its own Write Gate,
+re-checks the head and existing reviews before the POST, and is verified by
+re-reading the review.
+
+### 15. Record what was posted in PR.log
 
 `PR.log` is owned by [jira-worklog-processor](../jira-worklog-processor/SKILL.md)
 § "PR.log Entry Format", and appends route through the Write Gate Protocol in
@@ -276,6 +295,13 @@ POSTED COMMENTS:
 
 NOT POSTED (kept in chat):
   - <finding> — <which of the three bars it failed>
+
+SUBMITTED REVIEW:
+  Event: APPROVE | REQUEST_CHANGES | WITHHELD   State: APPROVED | CHANGES_REQUESTED | none
+  Reviewer: <login>   Head: <sha>
+  https://github.com/<org>/<repo>/pull/<N>#pullrequestreview-<id>
+  Basis: <most severe unresolved finding | no findings>   Withheld: <reason>
+  Verified: <REVIEW_VERIFY_FILE>
 ```
 
 The `NOT POSTED` list is the point of the block. The three-bar rule means some
@@ -303,12 +329,13 @@ POSTED COMMENTS FOLLOW-UP (YYYY-MM-DDTHH:MM):
 not addressed, and merged anyway is the single most useful thing to find in
 this log six months later.
 
-### 13. Report back
+### 16. Report back
 
 Give the user the `html_url` permalink, one sentence on the finding, the merge
 recommendation, whether the comment has an applicable one-click suggestion,
 whether a validated local fix was prepared, and the workspace artifact
-directory and comment-file path.
+directory and comment-file path. Add the verified review state and permalink,
+or the `WITHHELD` reason; the merge recommendation must match it.
 
 ## Production-ready comment contract
 
@@ -449,7 +476,9 @@ Prepare the fix:
 
 ## Constraints
 
-- Posting a comment is the only remote write to the PR.
+- The only remote writes to the PR are proven inline comments and one gated
+  `APPROVE` or `REQUEST_CHANGES` review per head SHA. Never merge, dismiss
+  reviews, update the branch, change labels or assignees, commit, or push.
 - Local remediation follows the mode and Write Gate protocols. Never commit or
   push.
 - Store PR-review artifacts only under
@@ -459,9 +488,9 @@ Prepare the fix:
   [worklog-chat-memory](../worklog-chat-memory/SKILL.md) § "Record turn events".
   Write `journal.db` synchronously first with exact user text, exact final
   assistant response, PR URL/ticket keys in `tickets` when known, and comment
-  id and permalink in `raw_payload` or the assistant text. Only after success
-  append the shadow audit entry to `prompt.log` with a timestamp, comment id,
-  and permalink.
+  and review ids and permalinks in `raw_payload` or the assistant text. Only
+  after success append the shadow audit entry to `prompt.log` with a
+  timestamp, ids, and permalinks.
 - The `PR.log` append is a Write Gate operation owned by `devops-daily-protocol`.
   `prompt.log` and `PR.log` are both append-only; never rewrite an entry. If
   `record-event` fails, leave the failure visible and do not append
