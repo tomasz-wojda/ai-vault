@@ -1326,6 +1326,13 @@ class InstallerTest(unittest.TestCase):
                 "hooks/git-handoff-shell-attribution.py",
                 commands,
             )
+            for name in (
+                "baseline",
+                "file-edit",
+                "capture-response",
+                "require-sync",
+            ):
+                self.assertIn(f"hooks/ticket-sync-{name}.py", commands)
             with mock.patch.object(Path, "home", return_value=home):
                 repeated, repeated_hooks, repeated_path = installer.plan_install(
                     "user",
@@ -1390,6 +1397,10 @@ class InstallerTest(unittest.TestCase):
             ]
             self.assertIn(".cursor/hooks/unrelated.py", commands)
             self.assertIn(".cursor/hooks/git-handoff-guard-git.py", commands)
+            self.assertIn(
+                ".cursor/hooks/ticket-sync-require-sync.py",
+                commands,
+            )
             self.assertEqual(
                 installed["hooks"]["preToolUse"][0]["matcher"],
                 "Shell",

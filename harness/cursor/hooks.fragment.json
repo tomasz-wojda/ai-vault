@@ -5,6 +5,10 @@
       {
         "command": ".cursor/hooks/git-handoff-baseline.py",
         "failClosed": true
+      },
+      {
+        "command": ".cursor/hooks/ticket-sync-baseline.py",
+        "failClosed": false
       }
     ],
     "beforeShellExecution": [
@@ -38,12 +42,20 @@
       {
         "command": ".cursor/hooks/git-handoff-file-attribution.py",
         "failClosed": true
+      },
+      {
+        "command": ".cursor/hooks/ticket-sync-file-edit.py",
+        "failClosed": false
       }
     ],
     "afterAgentResponse": [
       {
         "command": ".cursor/hooks/git-handoff-capture-response.py",
         "failClosed": true
+      },
+      {
+        "command": ".cursor/hooks/ticket-sync-capture-response.py",
+        "failClosed": false
       }
     ],
     "stop": [
@@ -51,6 +63,11 @@
         "command": ".cursor/hooks/git-handoff-require-handoff.py",
         "failClosed": true,
         "loop_limit": 2
+      },
+      {
+        "command": ".cursor/hooks/ticket-sync-require-sync.py",
+        "failClosed": false,
+        "loop_limit": 1
       }
     ]
   }

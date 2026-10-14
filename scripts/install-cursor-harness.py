@@ -19,6 +19,10 @@ HOOK_LINKS = {
     "git-handoff-shell-attribution.py": "record-shell-attribution.py",
     "git-handoff-capture-response.py": "capture-agent-response.py",
     "git-handoff-require-handoff.py": "require-commit-handoff.py",
+    "ticket-sync-baseline.py": "capture-ticket-sync-prompt.py",
+    "ticket-sync-file-edit.py": "record-ticket-sync-edit.py",
+    "ticket-sync-capture-response.py": "capture-ticket-sync-response.py",
+    "ticket-sync-require-sync.py": "require-ticket-sync.py",
 }
 LEGACY_HOOK_LINKS = {
     "ai-vault-guard-git.py": "guard-git-mutations.py",
