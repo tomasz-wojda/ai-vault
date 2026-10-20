@@ -1,6 +1,6 @@
 ---
 name: devops-daily-protocol
-version: "1.3.0"
+version: "1.4.0"
 description: >-
   Orchestrates daily DevOps operations: pulling JIRA tickets, selecting work items,
   creating structured worklog files, integrating ai-worklog and New Relic monitoring,
