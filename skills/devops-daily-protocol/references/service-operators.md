@@ -17,6 +17,8 @@ validation of any action, run `ai-worklog help --json service <name> <action>`.
 | verify | `ai-worklog service jira verify [YYYY-MM-DD]` | Compare local worklog/ files against Tempo entries |
 | whoami | `ai-worklog service jira whoami` | Validate Jira identity and authentication |
 | log-time | `ai-worklog service jira log-time <KEY> <DATE> <SECONDS> <COMMENT>` | Preview or apply a Tempo worklog |
+| comment | `ai-worklog service jira comment <KEY> (<TEXT...> \| --file PATH)` | Preview or apply a Jira comment; resolves `[~user]` mentions, refuses duplicates |
+| comment-edit | `ai-worklog service jira comment-edit <KEY> <COMMENT-ID> (<TEXT...> \| --file PATH)` | Preview or apply an edit of an own Jira comment; refuses other authors and unchanged bodies |
 | assets-schemas | `ai-worklog service jira assets-schemas` | Jira Assets (Insight) object schemas |
 | assets-types | `ai-worklog service jira assets-types <SCHEMA_ID>` | Object types in one schema |
 | assets-attributes | `ai-worklog service jira assets-attributes <TYPE_ID>` | Attribute definitions of one object type |
@@ -25,8 +27,8 @@ validation of any action, run `ai-worklog help --json service <name> <action>`.
 | get-ci | `ai-worklog service jira get-ci <CI-KEY>` | One application CI (`A.A.<ENV>.<App>`) with Artifactory path, automation flag, pipeline URL, status |
 | get-cis | `ai-worklog service jira get-cis [--env ENV] [--limit N]` | All application CIs: key, id, and name |
 
-All Jira and Assets actions are read-only except `log-time`, which is dry-run
-until Write Gate approval adds `--apply`. Assets reads are GET-only. `assets-object`
+All Jira and Assets actions are read-only except `log-time`, `comment` and `comment-edit`, which
+are dry-run until Write Gate approval adds `--apply`. Assets reads are GET-only. `assets-object`
 and `assets-search` return every attribute, including owner and user fields;
 `get-ci` returns only the mapped CI fields.
 
