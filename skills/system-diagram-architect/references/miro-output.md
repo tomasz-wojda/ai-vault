@@ -1,20 +1,23 @@
 # Miro output
 
 Built for the Miro MCP Canvas Composer tools (`canvas_create_from_svg`,
-`canvas_update_from_svg`, `canvas_search`, `canvas_read_as_svg`). Read the
-Canvas Composer skill tool once before the first canvas call in a session.
+`canvas_update_from_svg`, `canvas_search`, `canvas_read_as_svg`). Call
+`canvas_get_canvas_composer_skill` once before the first canvas call in a
+session. An offline copy of the rules this skill uses is in
+[board-format](canvas-composer/board-format.md),
+[widgets](canvas-composer/widgets.md),
+[create and update protocol](canvas-composer/create-update-protocol.md), and
+[search and read](canvas-composer/search-read.md). When the live text
+differs from the copy, follow the tool and warn the user.
 
 ## Document structure
 
-- Frame: `<g id transform="translate(x,y)" data-frame="Title">` whose first
-  child is `<rect data-type="frame" … data-title="Title" />`.
-- Shapes: `rect` with `data-content` holding escaped HTML (`<b>`, `<i>`,
-  `<br />`, `<a href>`), `data-shape="can"` for cylinders, `rx` for rounded.
-- Text: `textArea` with plain text.
-- Connectors: `line` with `data-start`, `data-end`, `data-start-side`,
-  `data-end-side`, `data-shape` (`straight` or `elbowed`), `data-arrow`,
-  optional `stroke-dasharray` and `data-content` label.
-- Never send `data-miro-id` on create; Miro assigns it.
+- The generator emits frames, shapes (including `data-shape="can"`
+  cylinders and `rx` rounding), `textArea` text and connectors; their DSL
+  rules are in [board-format](canvas-composer/board-format.md) and
+  [widgets](canvas-composer/widgets.md).
+- Ids follow the rules in [board-format](canvas-composer/board-format.md):
+  never author `data-miro-id`.
 
 ## Limits
 
@@ -50,18 +53,21 @@ Canvas Composer skill tool once before the first canvas call in a session.
   overlaps with neighbouring items.
 - A subtitle `textArea` renders 31 high for one line at font 22; the
   generator already uses 31.
+- When a call reports changed dimensions, handle them as described in
+  [create and update protocol](canvas-composer/create-update-protocol.md).
 
 ## Updating an existing board
 
-- Send a partial document with `canvas_update_from_svg`; elements are
-  matched on `data-miro-id`. Read live geometry first with
-  `canvas_read_as_svg` (selected `widget_ids`) or `canvas_search`, because
-  users move frames.
+- Read live geometry first with `canvas_read_as_svg` (selected
+  `widget_ids`) or `canvas_search`, because users move frames; send partial
+  documents as described in
+  [create and update protocol](canvas-composer/create-update-protocol.md).
 - To retitle a frame, resend its `<g>` with `data-miro-id`, the live
   `transform`, and the frame `rect` with the new `data-title`; children can
   be omitted.
-- Omitting an element never deletes it. Deletion needs
-  `data-deleted="true"` and explicit user confirmation of the specific items.
+- Deletions follow
+  [create and update protocol](canvas-composer/create-update-protocol.md)
+  and need explicit user confirmation of the specific items.
 - No tool renames a board. Report the rename as a manual step (board name at
   the top left).
 
@@ -73,6 +79,9 @@ Canvas Composer skill tool once before the first canvas call in a session.
    rename or relabel; expect zero results.
 3. Confirm every `failed_items` list was empty and no connector references
    a missing endpoint (the generator guarantees this before sending).
+
+Search modes and read limits are in
+[search and read](canvas-composer/search-read.md).
 
 ## Versioning
 

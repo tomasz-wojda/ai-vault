@@ -1,6 +1,6 @@
 ---
 name: system-diagram-architect
-version: "1.0.0"
+version: "1.1.0"
 description: Use when analyzing a repository, application, service, pipeline, or other resource to explain how it works and presenting the result as Mermaid diagrams or Miro boards, including architecture overviews, expanded per-component views, and control and data flows. Builds an evidence-backed model (observed, derived, inferred, unknown) from source before drawing, then renders both formats from one JSON spec.
 ---
 
@@ -135,3 +135,10 @@ from the skill directory.
 - [references/miro-output.md](references/miro-output.md): Canvas Composer
   structure and limits, two-pass publish, updates, read-back verification,
   versioning.
+- [board format](references/canvas-composer/board-format.md),
+  [widgets](references/canvas-composer/widgets.md),
+  [create and update protocol](references/canvas-composer/create-update-protocol.md),
+  [search and read](references/canvas-composer/search-read.md): verbatim
+  Canvas Composer rules captured 2026-10-24: board format, diagram widgets,
+  create and update protocol, search and rendered bounds; the live tool wins
+  on any difference.
