@@ -1,0 +1,93 @@
+{
+  "schema": "system-diagram/1",
+  "title": "Order service",
+  "overview": {
+    "title": "Order service architecture",
+    "subtitle": "Requests enter through the API gateway; orders persist to PostgreSQL and fan out through a queue. Solid arrows are calls, dashed arrows are data reads and writes.",
+    "legend": [
+      {"category": "white", "label": "External"},
+      {"category": "blue", "label": "Service code"},
+      {"category": "stone", "label": "Data store"}
+    ],
+    "zones": [
+      {"id": "client", "name": "Clients and partners", "subtitle": "outside the repository", "lane": 0, "columns": 1},
+      {"id": "api", "name": "order-service", "subtitle": "src/", "lane": 1, "columns": 2},
+      {"id": "data", "name": "Data", "subtitle": "deploy/compose.yaml", "lane": 2, "columns": 1}
+    ],
+    "nodes": [
+      {"id": "browser", "zone": "client", "title": "Web shop", "body": "checkout page posts orders", "category": "white", "evidence": "observed", "sources": ["docs/api.md:14"]},
+      {"id": "payments", "zone": "client", "title": "Payments API", "body": "charges a card per order", "category": "white", "evidence": "observed", "sources": ["src/worker/charge.ts:8"]},
+      {"id": "gateway", "zone": "api", "title": "API gateway", "body": "src/http/server.ts, routes and validation", "category": "blue", "evidence": "observed", "sources": ["src/http/server.ts:1"], "expands": "api"},
+      {"id": "worker", "zone": "api", "title": "Order worker", "body": "consumes order.created events", "category": "blue", "evidence": "inferred", "sources": ["src/worker/index.ts:3"]},
+      {"id": "orders-db", "zone": "data", "title": "orders database", "body": "PostgreSQL 16", "category": "stone", "shape": "can", "evidence": "observed", "sources": ["deploy/compose.yaml:22"], "expands": "data"},
+      {"id": "queue", "zone": "data", "title": "order queue", "body": "RabbitMQ exchange orders", "category": "yellow", "shape": "round", "evidence": "observed", "sources": ["deploy/compose.yaml:31"]}
+    ],
+    "edges": [
+      {"from": "browser", "to": "gateway", "relation": "calls", "label": "POST /orders", "evidence": "observed", "sources": ["docs/api.md:14"]},
+      {"from": "gateway", "to": "orders-db", "relation": "writes", "label": "insert order", "evidence": "observed", "sources": ["src/http/orders.ts:40"]},
+      {"from": "gateway", "to": "queue", "relation": "sends", "label": "order.created", "evidence": "observed", "sources": ["src/http/orders.ts:52"]},
+      {"from": "worker", "to": "queue", "relation": "reads", "evidence": "inferred", "sources": ["src/worker/index.ts:3"]},
+      {"from": "worker", "to": "payments", "relation": "calls", "label": "charge", "evidence": "observed", "sources": ["src/worker/charge.ts:8"]}
+    ],
+    "notes": [
+      {"title": "How to read", "lines": ["Boxes: components", "Cylinders: databases", "Solid arrow: call", "Dashed arrow: data read or write"]},
+      {"title": "Open questions", "lines": ["Worker deployment unit not found", "Retry policy for payments unknown"]}
+    ]
+  },
+  "frames": [
+    {
+      "key": "api",
+      "title": "order-service API gateway",
+      "subtitle": "Routes, validation and handlers in src/http/. Footers name the callers.",
+      "legend": [
+        {"category": "blue", "label": "Route"},
+        {"category": "green", "label": "Handler"}
+      ],
+      "areas": [
+        {
+          "name": "Routes",
+          "cards": [
+            {"category": "blue", "title": "POST /orders", "body": "validates body with OrderSchema, returns 201 with order id", "foot": "Web shop", "evidence": "observed", "sources": ["src/http/orders.ts:12"]},
+            {"category": "blue", "title": "GET /orders/:id", "body": "reads one order by primary key", "foot": "Web shop", "evidence": "observed", "sources": ["src/http/orders.ts:61"]},
+            {"category": "blue", "title": "OrderSchema", "body": "zod schema: customerId, items[] with sku and quantity, currency; rejects empty item lists", "foot": "POST /orders", "span": 2, "evidence": "observed", "sources": ["src/http/schema.ts:4"]}
+          ]
+        },
+        {
+          "name": "Handlers",
+          "cards": [
+            {"category": "green", "title": "createOrder", "body": "inserts the order, then publishes order.created", "foot": "POST /orders", "evidence": "observed", "sources": ["src/http/orders.ts:40"]},
+            {"category": "green", "title": "getOrder", "body": "selects by id, 404 when absent", "foot": "GET /orders/:id", "evidence": "observed", "sources": ["src/http/orders.ts:61"]},
+            {"category": "green", "title": "rate limiter", "body": "middleware name suggests per-IP limits; no configuration read", "foot": "all routes", "evidence": "inferred", "sources": ["src/http/server.ts:9"]}
+          ]
+        }
+      ]
+    },
+    {
+      "key": "data",
+      "title": "order-service data",
+      "subtitle": "Tables and messaging declared in migrations/ and deploy/compose.yaml.",
+      "legend": [
+        {"category": "stone", "label": "Table"},
+        {"category": "yellow", "label": "Messaging"}
+      ],
+      "areas": [
+        {
+          "name": "Tables",
+          "cards": [
+            {"category": "stone", "title": "orders", "body": "id, customer_id, status, total_cents, created_at", "foot": "createOrder, getOrder", "evidence": "observed", "sources": ["migrations/001_orders.sql:1"]},
+            {"category": "stone", "title": "order_items", "body": "order_id, sku, quantity; foreign key to orders", "foot": "createOrder", "evidence": "observed", "sources": ["migrations/001_orders.sql:12"]},
+            {"category": "stone", "title": "row count", "body": "2 tables, 8 columns in total", "foot": "derived from migrations", "evidence": "derived", "sources": ["migrations/001_orders.sql"]}
+          ]
+        },
+        {
+          "name": "Messaging",
+          "cards": [
+            {"category": "yellow", "title": "orders exchange", "body": "topic exchange declared at startup", "foot": "createOrder", "evidence": "observed", "sources": ["src/queue/setup.ts:5"]},
+            {"category": "yellow", "title": "order.created", "body": "payload: order id and total", "foot": "Order worker", "evidence": "observed", "sources": ["src/http/orders.ts:52"]},
+            {"category": "yellow", "title": "dead-letter queue", "body": "no declaration found in examined files", "foot": "", "evidence": "unknown", "sources": []}
+          ]
+        }
+      ]
+    }
+  ]
+}
