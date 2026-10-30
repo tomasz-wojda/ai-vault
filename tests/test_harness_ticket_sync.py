@@ -157,13 +157,79 @@ class TicketSyncTest(unittest.TestCase):
     def test_response_adds_keys(self):
         self.worklog(PRIMARY)
         self.worklog(JIRA)
-        self.run_hook(prompt_hook, self.payload(prompt="update SCTASK1280900"))
+        self.run_hook(prompt_hook, self.payload(prompt="look at KD-6945"))
+        self.run_hook(
+            prompt_hook,
+            self.payload("generation-2", prompt="update SCTASK1280900"),
+        )
         output = self.run_hook(
             response_hook,
-            self.payload(text="KD-6945 also changed"),
+            self.payload("generation-2", text="KD-6945 also changed"),
         )
         self.assertEqual({}, output)
-        self.assertEqual(["KD-6945", "SCTASK1280900"], self.state()["keys"])
+        self.assertEqual(
+            ["KD-6945", "SCTASK1280900"],
+            self.state("generation-2")["keys"],
+        )
+
+    def test_response_ignores_unbound_keys(self):
+        self.worklog(PRIMARY)
+        self.worklog(JIRA)
+        self.run_hook(prompt_hook, self.payload(prompt="update SCTASK1280900"))
+        self.run_hook(
+            response_hook,
+            self.payload(text="KD-6945 is unrelated"),
+        )
+        self.assertEqual(["SCTASK1280900"], self.state()["keys"])
+        message = self.stop()["followup_message"]
+        self.assertIn("`SCTASK1280900`", message)
+        self.assertNotIn("KD-6945", message)
+
+    def test_affinity_survives_baseline_reset(self):
+        self.worklog(JIRA)
+        self.run_hook(prompt_hook, self.payload(prompt="look at KD-6945"))
+        self.run_hook(prompt_hook, self.payload("generation-2", prompt=""))
+        self.assertFalse(
+            sync.generation_path("conversation-1", "generation-1").exists()
+        )
+        self.assertTrue(sync.affinity_path("conversation-1").is_file())
+        self.assertEqual({"KD-6945"}, sync.load_affinity("conversation-1"))
+
+    def test_edit_binds_key(self):
+        jira = self.worklog(JIRA)
+        self.run_hook(prompt_hook, self.payload(prompt=""))
+        self.run_hook(edit_hook, self.payload(file_path=str(jira)))
+        self.assertEqual({"KD-6945"}, sync.load_affinity("conversation-1"))
+        self.run_hook(prompt_hook, self.payload("generation-2", prompt=""))
+        self.run_hook(
+            response_hook,
+            self.payload("generation-2", text="KD-6945 deployed"),
+        )
+        output = self.run_hook(
+            stop_hook,
+            self.payload("generation-2", status="completed", loop_count=0),
+        )
+        self.assertIn("`KD-6945`", output["followup_message"])
+
+    def test_sync_followup_prompt_does_not_bind(self):
+        self.worklog(JIRA)
+        prompt = sync.followup_message(
+            {"KD-6945": ["worklog/2026-10-13_KD-6945.log"]}
+        )
+        self.run_hook(prompt_hook, self.payload(prompt=prompt))
+        self.assertEqual(set(), sync.load_affinity("conversation-1"))
+        self.assertEqual(["KD-6945"], self.state()["keys"])
+
+    def test_load_affinity_rejects_corrupt_or_foreign_file(self):
+        path = sync.affinity_path("conversation-1")
+        path.parent.mkdir(parents=True)
+        path.write_text("{not json", encoding="utf-8")
+        self.assertEqual(set(), sync.load_affinity("conversation-1"))
+        path.write_text(
+            json.dumps({"conversation_id": "other", "keys": ["KD-6945"]}),
+            encoding="utf-8",
+        )
+        self.assertEqual(set(), sync.load_affinity("conversation-1"))
 
     def test_response_without_state_is_noop(self):
         self.worklog(PRIMARY)

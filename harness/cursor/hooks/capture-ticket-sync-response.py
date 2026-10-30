@@ -22,7 +22,7 @@ def main() -> int:
     keys = sync.mentioned_keys(
         payload.get("text") or "",
         sync.active_worklogs(roots),
-    )
+    ) & sync.load_affinity(conversation_id)
     state["keys"] = sorted(set(state.get("keys") or []) | keys)
     sync.save_generation(state)
     print("{}")

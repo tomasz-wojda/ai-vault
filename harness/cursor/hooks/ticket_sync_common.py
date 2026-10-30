@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import json
 import re
-import shutil
 from pathlib import Path
 
 from handoff_common import read_state, require_ids, workspace_roots, write_state
 
 
 STATE_ROOT = Path.home() / ".cursor" / "hook-state" / "ticket-sync"
+AFFINITY_NAME = "affinity.json"
+SYNC_PREFIX = "Ticket sync (R-29):"
 WORKLOG_NAME = re.compile(
     r"^\d{4}-\d{2}-\d{2}_([A-Z][A-Z0-9]*(?:-[0-9]+)?)"
     r"(?:_[A-Za-z0-9_-]+)?\.log$"
@@ -76,7 +77,47 @@ def save_generation(state: dict) -> None:
 
 
 def clear_conversation(conversation_id: str) -> None:
-    shutil.rmtree(STATE_ROOT / conversation_id, ignore_errors=True)
+    directory = STATE_ROOT / conversation_id
+    if not directory.is_dir():
+        return
+    for path in directory.iterdir():
+        if path.name != AFFINITY_NAME and path.suffix in (".json", ".tmp"):
+            path.unlink(missing_ok=True)
+
+
+def affinity_path(conversation_id: str) -> Path:
+    return STATE_ROOT / conversation_id / AFFINITY_NAME
+
+
+def load_affinity(conversation_id: str) -> set[str]:
+    path = affinity_path(conversation_id)
+    if not path.is_file():
+        return set()
+    try:
+        state = read_state(path)
+    except (OSError, json.JSONDecodeError):
+        return set()
+    if not isinstance(state, dict) or state.get("conversation_id") != conversation_id:
+        return set()
+    keys = state.get("keys")
+    return {key for key in keys if isinstance(key, str)} if isinstance(keys, list) else set()
+
+
+def bind_keys(conversation_id: str, keys) -> None:
+    keys = set(keys)
+    if not keys:
+        return
+    write_state(
+        affinity_path(conversation_id),
+        {
+            "conversation_id": conversation_id,
+            "keys": sorted(load_affinity(conversation_id) | keys),
+        },
+    )
+
+
+def is_sync_followup(prompt: str) -> bool:
+    return (prompt or "").lstrip().startswith(SYNC_PREFIX)
 
 
 def followup_message(pending: dict[str, list[str]]) -> str:
@@ -87,7 +128,7 @@ def followup_message(pending: dict[str, list[str]]) -> str:
         for key in sorted(pending)
     )
     return (
-        f"Ticket sync (R-29): this turn touched {touched}. Without a Write "
+        f"{SYNC_PREFIX} this turn touched {touched}. Without a Write "
         "Gate preview and in the current mode, record anything new from "
         "this turn in each listed worklog and, where "
         "`.ai-worklog/state/<KEY>.json` exists, apply the matching "

@@ -26,6 +26,8 @@ validation of any action, run `ai-worklog help --json service <name> <action>`.
 | assets-search | `ai-worklog service jira assets-search "<IQL>" [--limit N]` | Bounded IQL search over Assets objects |
 | get-ci | `ai-worklog service jira get-ci <CI-KEY>` | One application CI (`A.A.<ENV>.<App>`) with Artifactory path, automation flag, pipeline URL, status |
 | get-cis | `ai-worklog service jira get-cis [--env ENV] [--limit N]` | All application CIs: key, id, and name |
+| boards | `ai-worklog service jira boards [--project KEY] [--name TEXT] [--limit N]` | Agile boards with type and project |
+| board | `ai-worklog service jira board <BOARD-ID>` | Board columns with statuses, `status_ids` mapping, active sprints |
 
 All Jira and Assets actions are read-only except `log-time`, `comment` and `comment-edit`, which
 are dry-run until Write Gate approval adds `--apply`. Assets reads are GET-only. `assets-object`

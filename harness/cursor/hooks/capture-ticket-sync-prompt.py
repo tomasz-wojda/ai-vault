@@ -16,10 +16,10 @@ def main() -> int:
     conversation_id, generation_id = sync.require_ids(payload)
     roots = sync.workspace_roots(payload)
     sync.clear_conversation(conversation_id)
-    keys = sync.mentioned_keys(
-        payload.get("prompt") or "",
-        sync.active_worklogs(roots),
-    )
+    prompt = payload.get("prompt") or ""
+    keys = sync.mentioned_keys(prompt, sync.active_worklogs(roots))
+    if not sync.is_sync_followup(prompt):
+        sync.bind_keys(conversation_id, keys)
     sync.save_generation(
         {
             "conversation_id": conversation_id,

@@ -38,6 +38,7 @@ def main() -> int:
     state["keys"] = sorted(set(state.get("keys") or []) | {key})
     state["edited_keys"] = sorted(set(state.get("edited_keys") or []) | {key})
     sync.save_generation(state)
+    sync.bind_keys(conversation_id, {key})
     print("{}")
     return 0
 
