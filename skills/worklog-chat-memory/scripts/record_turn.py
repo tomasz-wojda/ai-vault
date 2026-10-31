@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
+import sqlite3
 import subprocess
 import sys
 import time
@@ -16,6 +18,40 @@ CONTRACT = (
     / "references"
     / "journal-writer-contract.json"
 )
+
+
+LOCK_RELATIVE_PATH = ".ai-worklog/locks/_journal.sqlite"
+LOCK_TIMEOUT_SECONDS = float(os.environ.get("AI_MEMORY_LOCK_TIMEOUT", "10"))
+
+
+class MemoryLockBusy(Exception):
+    pass
+
+
+@contextlib.contextmanager
+def memory_lock(root: Path):
+    if os.environ.get("AI_MEMORY_LOCK") == "0":
+        yield
+        return
+    path = root / LOCK_RELATIVE_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(
+        path, timeout=LOCK_TIMEOUT_SECONDS, isolation_level=None
+    )
+    try:
+        try:
+            connection.execute("BEGIN EXCLUSIVE")
+        except sqlite3.OperationalError:
+            try:
+                connection.execute("BEGIN EXCLUSIVE")
+            except sqlite3.OperationalError as error:
+                raise MemoryLockBusy(str(error)) from error
+        try:
+            yield
+        finally:
+            connection.execute("ROLLBACK")
+    finally:
+        connection.close()
 
 
 def load_payload(path: Path, contract: dict) -> dict:
@@ -102,23 +138,30 @@ def main() -> int:
     if not ingester.is_file():
         print(f"record_turn: ingester not found: {ingester}", file=sys.stderr)
         return 2
-    with payload_path.open("rb") as stdin:
-        result = subprocess.run(
-            [str(ingester), contract["command"]],
-            cwd=memory_repo,
-            stdin=stdin,
-            check=False,
-        )
-    if result.returncode != 0:
+    try:
+        with memory_lock(root):
+            with payload_path.open("rb") as stdin:
+                result = subprocess.run(
+                    [str(ingester), contract["command"]],
+                    cwd=memory_repo,
+                    stdin=stdin,
+                    check=False,
+                )
+            if result.returncode != 0:
+                print(
+                    "record_turn: record-event failed; prompt.log not appended",
+                    file=sys.stderr,
+                )
+                return result.returncode
+            timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            with (root / "prompt.log").open("a", encoding="utf-8") as log:
+                log.write(prompt_log_entry(payload, timestamp))
+    except MemoryLockBusy as error:
         print(
-            "record_turn: record-event failed; prompt.log not appended",
+            f"record_turn: memory lock busy; nothing recorded: {error}",
             file=sys.stderr,
         )
-        return result.returncode
-
-    timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    with (root / "prompt.log").open("a", encoding="utf-8") as log:
-        log.write(prompt_log_entry(payload, timestamp))
+        return 75
     if not arguments.keep_payload:
         payload_path.unlink()
     return 0

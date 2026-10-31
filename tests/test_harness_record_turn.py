@@ -3,6 +3,8 @@ import os
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 import unittest
 from pathlib import Path
 
@@ -149,6 +151,143 @@ class RecordTurnTest(unittest.TestCase):
             )
         self.assertEqual(result.returncode, 2)
         self.assertIn("workspace root not found", result.stderr)
+
+    def hold_lock(self, seconds: float) -> subprocess.Popen:
+        lock = self.workspace / ".ai-worklog" / "locks" / "_journal.sqlite"
+        lock.parent.mkdir(parents=True, exist_ok=True)
+        holder = subprocess.Popen(
+            [
+                sys.executable,
+                "-c",
+                "import sqlite3, sys, time\n"
+                "c = sqlite3.connect(sys.argv[1], isolation_level=None)\n"
+                "c.execute('BEGIN EXCLUSIVE')\n"
+                "print('held', flush=True)\n"
+                "time.sleep(float(sys.argv[2]))\n",
+                str(lock),
+                str(seconds),
+            ],
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+        self.assertEqual(holder.stdout.readline().strip(), "held")
+        return holder
+
+    def test_busy_lock_records_nothing_and_leaves_prompt_log_alone(self):
+        self.ingester(0)
+        self.write_payload()
+        holder = self.hold_lock(5)
+        try:
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--workspace-root",
+                    str(self.workspace),
+                    "--payload",
+                    str(self.payload),
+                ],
+                capture_output=True,
+                text=True,
+                env={
+                    **os.environ,
+                    "PYTHONDONTWRITEBYTECODE": "1",
+                    "AI_MEMORY_LOCK_TIMEOUT": "0.3",
+                },
+            )
+        finally:
+            holder.kill()
+            holder.wait()
+        self.assertEqual(result.returncode, 75)
+        self.assertIn("memory lock busy", result.stderr)
+        self.assertFalse(self.received.exists())
+        self.assertFalse((self.workspace / "prompt.log").exists())
+        self.assertTrue(self.payload.exists())
+
+    def test_waits_for_a_short_lock_then_records(self):
+        self.ingester(0)
+        self.write_payload()
+        holder = self.hold_lock(1)
+        try:
+            result = self.run_script()
+        finally:
+            holder.kill()
+            holder.wait()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.workspace / "prompt.log").exists())
+
+    def test_lock_off_switch_does_not_create_the_lock_file(self):
+        self.ingester(0)
+        self.write_payload()
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPT),
+                "--workspace-root",
+                str(self.workspace),
+                "--payload",
+                str(self.payload),
+            ],
+            capture_output=True,
+            text=True,
+            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1", "AI_MEMORY_LOCK": "0"},
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(
+            (self.workspace / ".ai-worklog" / "locks" / "_journal.sqlite").exists()
+        )
+
+    def test_parallel_writers_keep_prompt_log_entries_whole(self):
+        self.ingester(0)
+        big = "x" * 200_000
+        per_writer = 10
+        failures = []
+
+        def writer(name: str) -> None:
+            for index in range(per_writer):
+                payload_path = self.payload.parent / f"{name}-{index}.json"
+                payload_path.write_text(
+                    json.dumps(
+                        {
+                            "schema_version": 1,
+                            "source_ide": "cursor",
+                            "source_kind": "rule_write",
+                            "source_identity": "prompt.log",
+                            "user_text": f"{name}-{index}",
+                            "assistant_text": big + name,
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(SCRIPT),
+                        "--workspace-root",
+                        str(self.workspace),
+                        "--payload",
+                        str(payload_path),
+                    ],
+                    capture_output=True,
+                    text=True,
+                    env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                )
+                if result.returncode != 0:
+                    failures.append(result.stderr)
+
+        threads = [threading.Thread(target=writer, args=(name,)) for name in ("a", "b")]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        self.assertEqual(failures, [])
+        text = (self.workspace / "prompt.log").read_text(encoding="utf-8")
+        entries = text.split("--- PROMPT LOG ENTRY ---\n")[1:]
+        self.assertEqual(len(entries), 2 * per_writer)
+        for entry in entries:
+            self.assertTrue(entry.endswith("--- END PROMPT LOG ENTRY ---\n"))
+            self.assertEqual(entry.count("--- END PROMPT LOG ENTRY ---"), 1)
+            self.assertEqual(entry.count("x" * 1000), 200)
 
     def test_wrong_schema_version_is_rejected(self):
         self.ingester(0)

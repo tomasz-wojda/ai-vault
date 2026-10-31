@@ -304,7 +304,7 @@ When a user prompt is received, evaluate in sequence:
 |----------|------------|
 | Long session with 20+ interactions | Each interaction appends independently. Use TAB sub-sections for multi-topic sessions. |
 | Session crashes mid-write | `prompt.log` may have incomplete entry. Next session should detect and close the dangling entry. |
-| Multiple agent instances write simultaneously | Not supported. One agent session per workspace at a time. |
+| Multiple agent instances write simultaneously | Supported with the memory lock. `record_turn.py` and the sweep take an exclusive lock on `.ai-worklog/locks/_journal.sqlite` while they write; a busy lock fails with exit code 75 and nothing is recorded. Each ticket has its own resume in `worklog-chat/ticket-resume/<KEY>.md`. See `docs/ai-worklog-scaleup-addendum.md` for the per-ticket rules. |
 
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: worklog-chat-memory
-version: "1.3.0"
+version: "1.4.0"
 description: >-
   Retrieves and maintains workspace conversation memory from the immutable
   SQLite journal, materialized turns, and tiered SQLite indexes. Use when
@@ -115,10 +115,28 @@ Add facets to an FTS expression with column-scoped terms, for example
 
 Use the materialized digest first. It is already curated to the 22000-byte
 budget and can be read or referenced without invoking the database.
+`RESUME.md` is an index: one block per active ticket (lifecycle, phase, next
+action, freshness, path of the ticket resume), then recent turns that have no
+ticket. Set `AI_MEMORY_RESUME_MODE=global` for the sweep to restore the
+earlier single global digest.
 
 ```bash
 cat "${MEMORY_TREE}/RESUME.md"
 ```
+
+A session that works on one ticket reads that ticket's resume instead. It
+holds the ticket capsule, the next action, open decisions and blockers from
+the ticket state file, and the recent turns of that ticket within 12000 bytes.
+The sweep refreshes only the resumes of tickets that changed.
+
+```bash
+cat "${MEMORY_TREE}/ticket-resume/KD-6999.md"
+cd "${MEMORY_REPO}" && ./ai-memory-ingester resume --ticket KD-6999
+```
+
+`resume --ticket` prints the ticket resume when it exists and falls back to
+the retrieval resume otherwise, or when `--mode`, `--impact`, `--since`,
+`--until` or `--json` is given.
 
 For a direct database resume, keep only complete turns whose cumulative UTF-8
 content remains within the budget.
@@ -218,11 +236,20 @@ Every IDE runs the same two steps; only `source_ide` differs (`cursor`,
      --payload tmp/journal-turns/turn-example.json
    ```
 
-`record_turn.py` validates the required fields, pipes the file to
-`ai-memory-ingester record-event` on stdin, and only after success appends the
-`prompt.log` entry (`USER: <user_text>`, `ASSISTANT: <mode> — <assistant_text>`)
-and deletes the payload. On failure it exits non-zero, keeps the payload for a
-retry, and does not touch `prompt.log`.
+`record_turn.py` validates the required fields, takes the memory lock, pipes
+the file to `ai-memory-ingester record-event` on stdin, and only after success
+appends the `prompt.log` entry (`USER: <user_text>`, `ASSISTANT: <mode> —
+<assistant_text>`), releases the lock and deletes the payload. On failure it
+exits non-zero, keeps the payload for a retry, and does not touch `prompt.log`.
+
+The memory lock is an exclusive SQLite transaction on
+`<workspace>/.ai-worklog/locks/_journal.sqlite`. It keeps a journal row and its
+`prompt.log` entry together when several sessions record turns at the same
+time, and the operating system releases it if the process stops. The wait is
+10 seconds (`AI_MEMORY_LOCK_TIMEOUT` sets another value in seconds). If the
+lock stays busy, the script exits with code 75, records nothing and leaves the
+payload in place for a retry. `AI_MEMORY_LOCK=0` turns the lock off. The
+`record-event` output line ends with `tickets=<keys>`.
 
 Do not rely on Claude user or project hooks for capture; organization policy
 blocks them and rules remain the portable adapter. In Cursor, the payload file
@@ -236,6 +263,10 @@ Run the unified sweep at session start:
 cd "${MEMORY_REPO}"
 ./ai-memory-ingester sweep-memory --workspace-root "${MEMORY_WORKSPACE_ROOT}"
 ```
+
+The sweep takes the same memory lock while it writes `RESUME.md` and the
+ticket resumes. It builds the content before it takes the lock, so the lock is
+held for file writes only.
 
 Supply journal or stream content through standard input or a temporary file.
 Never place content in an interpolated command argument. During rollback the
