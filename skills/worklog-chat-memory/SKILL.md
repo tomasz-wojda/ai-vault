@@ -1,6 +1,6 @@
 ---
 name: worklog-chat-memory
-version: "1.4.0"
+version: "1.5.0"
 description: >-
   Retrieves and maintains workspace conversation memory from the immutable
   SQLite journal, materialized turns, and tiered SQLite indexes. Use when
@@ -57,6 +57,34 @@ cd "${MEMORY_REPO}"
 Use `--dataset worklog-chat-all` only when the request is forensic or the
 default tiers return nothing. Use `--db` only for explicit legacy-compatible
 single-database inspection.
+
+## Ask a question
+
+`query` accepts a plain-language question in English or Polish, with or without
+diacritics. If the strict query (all words ANDed) finds nothing, a relaxed query
+runs: stop words removed, remaining words ORed with prefix terms, and Polish `ł`
+variants for Polish queries. A query with an operator, phrase, parentheses, a
+column filter or a typed prefix is never rewritten.
+
+```bash
+cd "${MEMORY_REPO}"
+./ai-memory-ingester query "what did we decide about the traefik attribute" --limit 10 --explain
+```
+
+- `--relax auto|on|off` controls the relaxed query; `AI_MEMORY_RELAX=0` turns it off.
+- `--explain` prints the query plan and the re-rank and late-pool status.
+- If the memory service runs (`ai-worklog memory serve`), the top candidates are
+  re-ranked by passage and a late-interaction pool adds recall. Flags:
+  `--rerank auto|on|off`, `--rerank-depth N`, `--rerank-budget-ms N`,
+  `--late auto|on|off`. `AI_MEMORY_RERANK=0` and `AI_MEMORY_LATE=0` turn them off.
+  Without the service the output is the lexical order and `--explain` says why;
+  `--rerank on` exits with code 5 instead.
+- Explicit queries, ticket-only queries and keyword results that work today do
+  not change.
+
+Build and check the passage index with `ai-memory-ingester reindex [--verify]`
+(or `ai-worklog memory reindex`). Measure changes with `ai-memory-ingester eval`
+against a labelled query set kept outside git.
 
 ## Retrieve a ticket
 
