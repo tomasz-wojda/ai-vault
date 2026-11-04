@@ -6,6 +6,7 @@ import argparse
 import contextlib
 import json
 import os
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -96,6 +97,64 @@ def prompt_log_entry(payload: dict, timestamp: str) -> str:
     )
 
 
+ERROR_LOG_LIMIT_BYTES = 64 * 1024
+
+
+def java_probe() -> list[str]:
+    java = shutil.which("java")
+    lines = [
+        f"JAVA_HOME: {os.environ.get('JAVA_HOME', '')}",
+        f"java on PATH: {java or 'not found'}",
+    ]
+    if java:
+        try:
+            done = subprocess.run(
+                [java, "-version"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+            first = (done.stderr or done.stdout).splitlines()
+            lines.append(f"java -version: {first[0] if first else ''}")
+        except (OSError, subprocess.SubprocessError) as error:
+            lines.append(f"java -version failed: {error}")
+    return lines
+
+
+def error_log_path(payload_path: Path) -> Path:
+    return payload_path.with_name(payload_path.name + ".error.log")
+
+
+def write_error_log(
+    payload_path: Path,
+    command: list[str],
+    working_folder: Path,
+    returncode: int,
+    stderr_text: str,
+) -> Path | None:
+    clipped = stderr_text.encode("utf-8")[:ERROR_LOG_LIMIT_BYTES].decode(
+        "utf-8", errors="ignore"
+    )
+    lines = [
+        f"time: {time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}",
+        f"exit code: {returncode}",
+        f"command: {' '.join(command)}",
+        f"working folder: {working_folder}",
+        f"payload: {payload_path}",
+        *java_probe(),
+        "stderr:",
+        clipped,
+    ]
+    path = error_log_path(payload_path)
+    try:
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    except OSError as error:
+        print(f"record_turn: cannot write {path}: {error}", file=sys.stderr)
+        return None
+    return path
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Record a turn in journal.db, then append prompt.log.",
@@ -140,19 +199,31 @@ def main() -> int:
         return 2
     try:
         with memory_lock(root):
+            command = [str(ingester), contract["command"]]
             with payload_path.open("rb") as stdin:
                 result = subprocess.run(
-                    [str(ingester), contract["command"]],
+                    command,
                     cwd=memory_repo,
                     stdin=stdin,
+                    stderr=subprocess.PIPE,
                     check=False,
                 )
+            stderr_text = result.stderr.decode("utf-8", errors="replace")
+            if stderr_text:
+                sys.stderr.write(stderr_text)
+                sys.stderr.flush()
             if result.returncode != 0:
+                log = write_error_log(
+                    payload_path, command, memory_repo, result.returncode, stderr_text
+                )
+                where = f"; details in {log}" if log else ""
                 print(
-                    "record_turn: record-event failed; prompt.log not appended",
+                    f"record_turn: record-event failed (exit {result.returncode})"
+                    f"{where}; prompt.log not appended",
                     file=sys.stderr,
                 )
                 return result.returncode
+            error_log_path(payload_path).unlink(missing_ok=True)
             timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
             with (root / "prompt.log").open("a", encoding="utf-8") as log:
                 log.write(prompt_log_entry(payload, timestamp))

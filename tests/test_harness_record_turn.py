@@ -30,12 +30,18 @@ class RecordTurnTest(unittest.TestCase):
     def tearDown(self):
         self.directory.cleanup()
 
-    def ingester(self, exit_code: int) -> None:
+    def ingester(self, exit_code: int, stderr_text: str = "", stdout_text: str = "") -> None:
         script = self.memory_repo / "ai-memory-ingester"
+        stderr_file = self.workspace / "stub-stderr.txt"
+        stdout_file = self.workspace / "stub-stdout.txt"
+        stderr_file.write_text(stderr_text, encoding="utf-8")
+        stdout_file.write_text(stdout_text, encoding="utf-8")
         script.write_text(
             "#!/bin/sh\n"
             f"[ \"$1\" = record-event ] || exit 9\n"
             f"cat > '{self.received}'\n"
+            f"cat '{stdout_file}'\n"
+            f"cat '{stderr_file}' >&2\n"
             f"exit {exit_code}\n",
             encoding="utf-8",
         )
@@ -295,6 +301,91 @@ class RecordTurnTest(unittest.TestCase):
         result = self.run_script()
         self.assertEqual(result.returncode, 2)
         self.assertFalse(self.received.exists())
+
+    def error_log(self) -> Path:
+        return self.payload.resolve().with_name(self.payload.name + ".error.log")
+
+    def test_failure_writes_an_error_log_with_the_stderr_and_java_lines(self):
+        message = "java.lang.UnsupportedClassVersionError: PrecompiledRunner was compiled by a more recent version\n"
+        self.ingester(1, stderr_text=message)
+        self.write_payload()
+        result = self.run_script()
+        self.assertEqual(result.returncode, 1)
+        log = self.error_log()
+        self.assertTrue(log.exists())
+        text = log.read_text(encoding="utf-8")
+        self.assertIn("exit code: 1", text)
+        self.assertIn("UnsupportedClassVersionError", text)
+        self.assertIn("JAVA_HOME:", text)
+        self.assertIn("java on PATH:", text)
+        self.assertIn(f"payload: {self.payload.resolve()}", text)
+        self.assertIn("working folder:", text)
+
+    def test_failure_message_names_the_log_and_keeps_the_phrase(self):
+        self.ingester(3, stderr_text="boom\n")
+        self.write_payload()
+        result = self.run_script()
+        self.assertEqual(result.returncode, 3)
+        self.assertIn("exit 3", result.stderr)
+        self.assertIn(f"details in {self.error_log()}", result.stderr)
+        self.assertIn("prompt.log not appended", result.stderr)
+        self.assertIn("boom", result.stderr)
+        self.assertFalse((self.workspace / "prompt.log").exists())
+        self.assertTrue(self.payload.exists())
+
+    def test_error_log_does_not_contain_the_payload_text(self):
+        self.ingester(1, stderr_text="boom\n")
+        self.write_payload(user_text="private user words", assistant_text="private assistant words")
+        self.run_script()
+        text = self.error_log().read_text(encoding="utf-8")
+        self.assertNotIn("private user words", text)
+        self.assertNotIn("private assistant words", text)
+
+    def test_stderr_longer_than_64_kb_is_cut_in_the_log(self):
+        self.ingester(1, stderr_text="e" * 200000)
+        self.write_payload()
+        result = self.run_script()
+        self.assertEqual(result.returncode, 1)
+        size = self.error_log().stat().st_size
+        self.assertLess(size, 70000)
+        self.assertGreater(size, 65000)
+
+    def test_success_removes_a_stale_error_log(self):
+        self.ingester(0)
+        self.write_payload()
+        self.error_log().write_text("old failure\n", encoding="utf-8")
+        result = self.run_script()
+        self.assertEqual(result.returncode, 0)
+        self.assertFalse(self.error_log().exists())
+        self.assertFalse(self.payload.exists())
+
+    def test_result_line_on_stdout_still_passes_through(self):
+        self.ingester(0, stdout_text="record-event\tid=abc\tsequence=1\n")
+        self.write_payload()
+        result = self.run_script()
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("record-event\tid=abc\tsequence=1", result.stdout)
+
+    def test_stderr_of_a_successful_write_is_still_shown_and_leaves_no_log(self):
+        self.ingester(0, stderr_text="note: something to read\n")
+        self.write_payload()
+        result = self.run_script()
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("note: something to read", result.stderr)
+        self.assertFalse(self.error_log().exists())
+
+    def test_unwritable_log_folder_keeps_the_exit_code_and_the_phrase(self):
+        self.ingester(2, stderr_text="boom\n")
+        self.write_payload()
+        os.chmod(self.payload.parent, 0o555)
+        try:
+            result = self.run_script()
+        finally:
+            os.chmod(self.payload.parent, 0o755)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("cannot write", result.stderr)
+        self.assertIn("prompt.log not appended", result.stderr)
+        self.assertNotIn("details in", result.stderr)
 
 
 if __name__ == "__main__":
