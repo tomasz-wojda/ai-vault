@@ -1,6 +1,6 @@
 ---
 name: worklog-chat-memory
-version: "1.5.0"
+version: "1.6.0"
 description: >-
   Retrieves and maintains workspace conversation memory from the immutable
   SQLite journal, materialized turns, and tiered SQLite indexes. Use when
