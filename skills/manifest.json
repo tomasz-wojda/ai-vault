@@ -48,6 +48,12 @@
       "dir": "system-diagram-architect",
       "required": false,
       "ides": ["antigravity", "claude", "cursor"]
+    },
+    {
+      "name": "snow-vulnerability-remediation",
+      "dir": "snow-vulnerability-remediation",
+      "required": false,
+      "ides": ["antigravity", "claude", "cursor"]
     }
   ]
 }
