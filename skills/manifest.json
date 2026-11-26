@@ -54,6 +54,12 @@
       "dir": "snow-vulnerability-remediation",
       "required": false,
       "ides": ["antigravity", "claude", "cursor"]
+    },
+    {
+      "name": "sre-incident-investigation",
+      "dir": "sre-incident-investigation",
+      "required": false,
+      "ides": ["antigravity", "claude", "cursor"]
     }
   ]
 }
