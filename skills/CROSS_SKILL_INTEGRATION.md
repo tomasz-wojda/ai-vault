@@ -78,8 +78,8 @@ wins when two of them collide.
 
 ### 2.2 Write Routing — owner `devops-daily-protocol`
 
-- **R-05** Every write routes through the Write Gate: file creation and edits, HTTP POST/PUT/DELETE, git operations, Tempo submission, and `--apply` on any framework command. L3 worklog edits, L4 pipeline edits and L5 PR.log appends are not exempt. Ticket sync under R-29 and the SRE.log append under R-31 are the only exceptions.
-- **R-06** The gate's five steps map onto modes — ANNOUNCE, PREVIEW and WAIT belong to PLAN; EXECUTE and VERIFY belong to EXECUTE. User approval does not substitute for `MODE: EXECUTE`. Ticket sync under R-29 skips PREVIEW and WAIT and runs in any mode. So does the SRE.log append under R-31.
+- **R-05** Every write routes through the Write Gate: file creation and edits, HTTP POST/PUT/DELETE, git operations, Tempo submission, and `--apply` on any framework command. L3 worklog edits, L4 pipeline edits and L5 PR.log appends are not exempt. Ticket sync under R-29 and the SRE.log append and incident directory writes under R-31 are the only exceptions.
+- **R-06** The gate's five steps map onto modes — ANNOUNCE, PREVIEW and WAIT belong to PLAN; EXECUTE and VERIFY belong to EXECUTE. User approval does not substitute for `MODE: EXECUTE`. Ticket sync under R-29 skips PREVIEW and WAIT and runs in any mode. So do the SRE.log append and incident directory writes under R-31.
 - **R-07** One gate is active at a time. A mode switch mid-gate cancels it, and the operation is re-evaluated in the new mode.
 - **R-08** Credential files are referenced by path and never read for their values, in any mode.
 
@@ -108,7 +108,7 @@ wins when two of them collide.
 
 ### 2.6 Precedence
 
-- **R-23** Where rules conflict, precedence runs safety, then mode, then content, then style. Concretely: the Write Gate's WAIT step is a safety requirement and is outside the scope of the `.rules` §5 prohibition on questions. A confirmation prompt before a write is mandatory regardless of response-style directives, except for ticket sync under R-29 and the SRE.log append under R-31.
+- **R-23** Where rules conflict, precedence runs safety, then mode, then content, then style. Concretely: the Write Gate's WAIT step is a safety requirement and is outside the scope of the `.rules` §5 prohibition on questions. A confirmation prompt before a write is mandatory regardless of response-style directives, except for ticket sync under R-29 and the SRE.log append and incident directory writes under R-31.
 
 ### 2.7 Runtime Precondition
 
@@ -131,7 +131,7 @@ wins when two of them collide.
 ### 2.11 SRE Incident Investigation — owner `sre-incident-investigation`
 
 - **R-30** A production incident activates L6 alongside L2 and L3; that covers the symptoms listed under L2's Production incidents routine. L6 drives triage, architecture reconstruction, ranked falsifiable hypotheses and the root-cause assessment. L2 supplies every diagnostic through its read-only contracts (R-03), and L3 formats the incident worklog FINDINGS when a worklog exists. Diagnostics never change production state. Remediation follows INNOVATE, PLAN and EXECUTE through L2's Write Gate, and approval from a user or incident commander does not replace `MODE: EXECUTE` (R-06). "Confirmed" requires direct evidence for the mechanism.
-- **R-31** Every L6 invocation ends with one entry appended to the workspace-root `SRE.log`, in any mode and without PREVIEW or WAIT. L3 owns the format, L6 the content, and L2 the lifecycle. The entry is written to `tmp/<key>/` and appended only through `append_sre_log.py`, which validates it and never rewrites the file. Entries carry no secrets, tokens or customer data. A turn that only reads or edits the skill files ends with `No SRE log entry needed.` In Cursor the harness `stop` hook sends one follow-up per generation when the skill was invoked — its `SKILL.md` was read, or the prompt named it — and `SRE.log` did not grow.
+- **R-31** Every L6 invocation ends with one entry appended to the workspace-root `SRE.log`, in any mode and without PREVIEW or WAIT. L3 owns the format, L6 the content, and L2 the lifecycle. The entry is written to `incidents/<key>/` and appended only through `append_sre_log.py`, which validates it and never rewrites the file. The same exception covers every write under `incidents/<key>/`: `report.md`, `evidence/`, `artifacts/` and the entry files. Entries carry no secrets, tokens or customer data. A turn that only reads or edits the skill files ends with `No SRE log entry needed.` In Cursor the harness `stop` hook sends one follow-up per generation when the skill was invoked — its `SKILL.md` was read, or the prompt named it — and `SRE.log` did not grow.
 
 ### 2.12 Composite Sequences
 
@@ -220,6 +220,7 @@ invocation ends with its SRE.log entry (R-31).
 | `.ai-worklog/config.json` | User/workspace | `ai-worklog workspace apply` | Framework commands |
 | `syntax_check.groovy` | `jenkins-pipeline-architect` | `jenkins-pipeline-architect` | `jenkins-pipeline-architect` |
 | `tmp/<KEY>/` | `jira-worklog-processor` | `jira-worklog-processor` | All skills |
+| `incidents/<key>/` | `sre-incident-investigation` | `sre-incident-investigation`, written under R-31 without PREVIEW or WAIT | `sre-incident-investigation`, `jira-worklog-processor` |
 | Jenkinsfiles | `jenkins-pipeline-architect` | Workspace/SCM | `jenkins-pipeline-architect` |
 | `vars/*.groovy` | `jenkins-pipeline-architect` | Workspace/SCM | `jenkins-pipeline-architect` |
 
@@ -415,3 +416,4 @@ CHECK 3: Is the Jenkinsfile a valid Groovy file?
 | 3.7 | 2026-09-23 | Added R-28: commit handoffs are generated once per repository and only for paths changed during the current agent generation. Clean and external-only work produces no Git commands. |
 | 3.8 | 2026-10-14 | Added R-29: ticket sync updates the active worklog and existing structured state after each turn without PREVIEW or WAIT, in any mode, enforced in Cursor by a harness stop hook. Amended R-05, R-06, R-09, R-20 and R-23 accordingly. |
 | 3.9 | 2026-11-26 | Added `sre-incident-investigation` as L6, a peer specialist to L4 and L5. New §2.11 with R-30 and R-31, SRE.log in the artifact table and conflict rules, an L6 activation column, and the incident response sequence routed through L6. Amended R-05, R-06 and R-23 for the R-31 exception. |
+| 3.10 | 2026-11-26 | `sre-incident-investigation` 2.0.0: incident files move to `incidents/<key>/` at the workspace root, and R-31 with R-05, R-06 and R-23 extends to every write there. Migration: SRE.log entries gain `Ticket:` on the INCIDENT line, a separate trigger label and evidence type on ROOT CAUSE, the `recovered` status and `none — <reason>` for empty ACTIONS; `append_sre_log.py` rejects the old format and entry files outside `incidents/<key>/`. Existing SRE.log entries are not migrated. |

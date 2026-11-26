@@ -128,6 +128,7 @@ class SreLogHookTest(unittest.TestCase):
         result = self.stop()
         self.assertTrue(result["followup_message"].startswith(sre.FOLLOWUP_PREFIX))
         self.assertIn("append_sre_log.py", result["followup_message"])
+        self.assertIn("incidents/<key>/", result["followup_message"])
         self.assertIn(sre.WAIVER, result["followup_message"])
         self.assertFalse(
             sre.generation_path("conversation-1", "generation-1").exists()

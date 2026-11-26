@@ -1,12 +1,12 @@
 # Incident Output Templates
 
-Use the shortest template that communicates the current state. During an active incident, lead with impact, status, and next action. In the final report, include architecture, evidence, hypothesis tests, cause, and remediation.
+Use the shortest template that communicates the current state. During an active incident, lead with impact, status, and next action. In the final report, include architecture, evidence, hypothesis tests, cause, and remediation. The Investigation report lives in `incidents/<key>/report.md` and is kept current every investigating turn.
 
 ## Active incident update
 
 ```markdown
 ### Incident update — <UTC timestamp>
-- Status: investigating / mitigating / monitoring / resolved
+- Status: investigating / mitigating / recovered / monitoring / resolved
 - Severity: <organization-defined value or unassigned>
 - Impact: <verified user/business impact; state estimates explicitly>
 - Affected scope: <service, environment, region/AZ, tenant, route, version>
@@ -58,7 +58,7 @@ Use the shortest template that communicates the current state. During an active 
 
 ## 6. Root-cause assessment
 - Root cause (confirmed / most likely / undetermined):
-- Trigger:
+- Trigger (confirmed / most likely / probable / undetermined; direct / correlational / none):
 - Contributing factors:
 - Propagation/amplification:
 - Detection/response gaps:

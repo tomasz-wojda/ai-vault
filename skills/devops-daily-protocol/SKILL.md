@@ -1,6 +1,6 @@
 ---
 name: devops-daily-protocol
-version: "1.6.0"
+version: "1.7.0"
 description: >-
   Orchestrates daily DevOps operations: pulling JIRA tickets, selecting work items,
   creating structured worklog files, integrating ai-worklog and New Relic monitoring,
@@ -33,6 +33,13 @@ Never directly open, print, echo, search, or read credential-bearing files for
 their values, including `*.properties`, `credentials`, `creds`, `token`,
 `cookie`, environment files, and private keys. Use the integration's
 `ai-worklog service` operator; otherwise inspect only filesystem metadata.
+
+Running `cat`, `sed`, `awk`, `cut`, `grep`/`rg` or `head`/`tail` on a
+credential file is forbidden, including through a redacting filter.
+
+Source `integrations/aws/` helpers only in a subshell:
+`( . integrations/aws/<profile>; <command> )`. Keys exported into the
+persistent shell override `AWS_PROFILE` for the rest of the session.
 
 After every interaction, record the turn through the governed
 `worklog-chat-memory` journal writer and shadow `prompt.log` append (see Prompt

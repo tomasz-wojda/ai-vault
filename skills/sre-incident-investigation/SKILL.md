@@ -1,6 +1,6 @@
 ---
 name: sre-incident-investigation
-version: "1.1.0"
+version: "2.0.0"
 description: Use when an SRE, platform, application, or production incident needs investigation; when alerts report elevated 5xx errors, latency, saturation, availability loss, failed deployments, pod or service instability, queue backlogs, database or dependency failures, or unexplained service degradation. Use to reconstruct architecture, develop and test competing hypotheses, identify root causes, and propose evidence-based remediation. Do not use this skill to execute unapproved production changes. Also use for New Relic violations or issues, OOMKilled or CrashLoopBackOff pods, and production problems found during ticket investigation. Every invocation appends an SRE.log entry.
 ---
 
@@ -34,6 +34,7 @@ This skill covers incident intake, triage, architecture-aware debugging, hypothe
 - **Tools:** diagnostics use L2's read-only contracts (`ai-worklog service newrelic` reads, read-only `kubectl`, `ai-worklog diag list` and `ai-worklog diag run`). Credential files are passed by path only (R-08).
 - **Worklog:** when a ticket worklog exists, L3 formats the FINDINGS, and large output goes to a `_raw.log` file (R-11).
 - **SRE.log:** follow R-31 and use the format in [worklog-reference.md](../jira-worklog-processor/worklog-reference.md) § "SRE.log Entry Format".
+- **Incident directory:** every incident file lives in `incidents/<key>/` at the workspace root: `report.md`, the `sre-log-*.txt` entry files, `evidence/` (each exact query or command next to its output) and `artifacts/` (boards, screenshots, scripts). Writes there follow the R-31 exception. Incident work does not use `tmp/`.
 
 ## Investigation workflow
 
@@ -48,7 +49,7 @@ Establish:
 - Symptoms and SLI signals: availability, error rate by class, throughput, p50/p95/p99 latency, saturation, queue age/depth, and relevant business outcomes.
 - Baseline: compare with a suitable healthy period, normal traffic pattern, and unaffected regions/versions/tenants. Account for seasonality and expected traffic changes.
 - Severity and urgency using the organization's policy. If no policy is known, report observable impact and state that severity is not assigned.
-- Prior entries for the incident key: `rg -n "^INCIDENT <key> " SRE.log`.
+- Prior entries for the incident key or its ticket: `rg -n "^INCIDENT <key> |Ticket: <ticket>$" SRE.log`. Mint the key once, by the rule in [worklog-reference.md](../jira-worklog-processor/worklog-reference.md) § "SRE.log Entry Format".
 
 Do not focus only on the alert. Determine whether the alert reflects customer impact, an internal component symptom, telemetry failure, or a false positive.
 
@@ -76,6 +77,8 @@ Build one UTC timeline covering the period before, during, and after the inciden
 - Scaling, restarts, rescheduling, node/AZ/region events, cloud-provider events, quota/limit events, and maintenance.
 - Traffic changes, batch jobs, scheduled tasks, migrations, backfills, data imports, and unusual client behavior.
 - Dependency health, database/queue/cache events, network/DNS/TLS events, and third-party status.
+
+In the first turn, before retention expires, save namespace events, HPA and ScaledObject descriptions, rollout history, and container restart reasons (`lastState`) to `incidents/<key>/evidence/`.
 
 Use comparable time windows and consistent dimensions. Distinguish event time from ingestion time. Check clock skew, delayed ingestion, sampling, retention, and cardinality limitations.
 
@@ -152,6 +155,8 @@ Separate:
 
 Declare a root cause **confirmed** only when the causal mechanism is supported by direct evidence, the timeline and affected path fit, and material competing explanations have been tested or reasonably excluded. Otherwise label it **most likely**, **probable**, or **undetermined**, state confidence, and list the evidence needed to confirm it.
 
+Label the trigger separately, with its own certainty and evidence type (`direct` or `correlational`). A root cause is **confirmed** only with a confirmed trigger backed by direct evidence. While the trigger is undetermined, the status is `recovered` once impact ends, never `monitoring` or `resolved`.
+
 A recovery after a change is useful evidence but is not automatically proof: check for concurrent changes, traffic changes, delayed recovery, and regression risk. Multiple interacting root causes are possible.
 
 ### 8. Recommend remediation and verification
@@ -170,20 +175,22 @@ After an authorized fix is applied, verify recovery against the original impact 
 
 ### 9. Communicate continuously
 
+Keep `incidents/<key>/report.md` current in every investigating turn, using the Investigation report template. Chat carries only what changed.
+
 For an active incident, provide a short status update when material evidence changes, when the leading hypothesis changes, before a risky proposed action, and at an agreed incident cadence. Separate facts, hypotheses, decisions, and unknowns. Avoid speculation in customer-facing statements.
 
 If investigation is blocked, state exactly what evidence or access is missing, why it matters, and the smallest next step to obtain it. Continue with available evidence rather than repeatedly asking for information already supplied.
 
 ### 10. Record the invocation in SRE.log
 
-1. Write the entry with the Write tool to `tmp/<key>/sre-log-<YYYYMMDDTHHMM>.txt`.
+1. Write the entry with the Write tool to `incidents/<key>/sre-log-<YYYYMMDDTHHMM>.txt`, taking the timestamp from `date +%Y%m%dT%H%M`.
 2. From the workspace root, run `python3 repos/ai-vault/skills/sre-incident-investigation/scripts/append_sre_log.py --entry <that file>`.
 3. This happens in any mode, without PREVIEW or WAIT. If the append is rejected, fix the entry and rerun.
 4. A turn that only reads or edits the skill files ends with `No SRE log entry needed.` instead.
 
 ## Required final deliverable
 
-Use `references/output-templates.md`. At minimum, report:
+Use `references/output-templates.md`. The deliverable lives in `incidents/<key>/report.md`. At minimum, report:
 
 1. **Incident summary:** current status, severity (or unassigned), affected service/environment, start time (UTC), and customer/business impact.
 2. **Architecture:** verified Mermaid diagram of the relevant request/job path, dependencies, control plane, and observability path; list unknowns.

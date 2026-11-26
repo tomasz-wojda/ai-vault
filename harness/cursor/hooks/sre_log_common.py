@@ -87,7 +87,7 @@ def followup_message() -> str:
         "did not grow. In the current mode and without a Write Gate preview, "
         "write one entry in the format of "
         "`repos/ai-vault/skills/jira-worklog-processor/worklog-reference.md` "
-        "§ \"SRE.log Entry Format\" to `tmp/<key>/sre-log-<YYYYMMDDTHHMM>.txt` "
+        "§ \"SRE.log Entry Format\" to `incidents/<key>/sre-log-<YYYYMMDDTHHMM>.txt` "
         "and append it from the workspace root with `python3 "
         "repos/ai-vault/skills/sre-incident-investigation/scripts/"
         "append_sre_log.py --entry <that file>`. If the turn only read or "

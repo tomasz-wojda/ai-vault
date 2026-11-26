@@ -1,6 +1,6 @@
 ---
 name: jira-worklog-processor
-version: "1.6.0"
+version: "1.7.0"
 description: >-
   Process JIRA tickets into structured worklog files following a multi-phase
   research-first workflow. Extends devops-daily-protocol with content generation

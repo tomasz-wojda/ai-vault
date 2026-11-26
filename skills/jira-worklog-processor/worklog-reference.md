@@ -619,17 +619,25 @@ When a PR relates to a worklog:
 Fields in this exact order:
 
 1. Header: `--- YYYY-MM-DDTHH:MM ---`, local time, the same as PR.log.
-2. `INCIDENT <key> | <environment> | <service or workflow>`. The key is the Jira key when a worklog exists. Otherwise it is the New Relic issue or violation ID, and failing that a slug `<service>-<YYYYMMDD>`.
+   - The entry file is `incidents/<key>/sre-log-<YYYYMMDDTHHMM>.txt` and its timestamp equals the header.
+   - The header is the local time at which the entry is written, read from `date`. It is never later than now and never earlier than the latest entry for the same key.
+2. `INCIDENT <key> | <environment> | <service or workflow> | Ticket: <Jira key|none>`.
+   - The key is minted in the first investigating turn and never changes.
+   - It is the Jira key when the incident arrives with a Jira ticket, whether or not a worklog exists. Otherwise it is the New Relic issue or violation ID, and failing that a slug `<primary-service>-<YYYYMMDD>` whose date is the UTC date of the incident start. A slug that already belongs to a different incident in `SRE.log` takes a `-2`, `-3` suffix.
+   - A ticket that appears later goes only in `Ticket:`; the key is not changed.
 3. `Mode: <RESEARCH|INNOVATE|PLAN|EXECUTE>   Worklog: <worklog path|none>`.
 4. A blank line.
 5. `SUMMARY:` with three lines:
-   - `Status: <investigating|mitigating|monitoring|resolved>   Severity: <value|unassigned>`
+   - `Status: <investigating|mitigating|recovered|monitoring|resolved>   Severity: <value|unassigned>`. `recovered` means impact ended while the trigger is undetermined. `monitoring` and `resolved` require a trigger that is not `undetermined`.
    - `Start (UTC): <ts|unknown>   Detected (UTC): <ts|unknown>`
    - `Impact: <measured impact, with estimates labelled>`
 6. `EVIDENCE:` with numbered lines `<n>. <source> — <query or command> — <observation> (<UTC ts>)`, or `none`.
 7. `HYPOTHESES:` with lines `H<n> <untested|supported|weakened|rejected|confirmed> <low|medium|high> — <If X, then Y because Z> — Test: <test> — Result: <result|untested>`, or `none`.
-8. `ROOT CAUSE: <confirmed|most likely|probable|undetermined> — <causal chain|not established>` on one line.
-9. `ACTIONS:` with lines `- <mitigation|corrective|prevention|detection> — <action> — Approval: <required|approved by <name>|n/a> — State: <proposed|approved|applied|verified>`, or `none`.
+8. `ROOT CAUSE: <confirmed|most likely|probable|undetermined> — Trigger: <confirmed|most likely|probable|undetermined> <direct|correlational|none> — <causal chain|not established>` on one line.
+   - A `confirmed` trigger requires `direct` evidence.
+   - An `undetermined` trigger takes `none`, and `none` is used only with `undetermined`.
+   - An overall `confirmed` requires a `confirmed` trigger.
+9. `ACTIONS:` with lines `- <mitigation|corrective|prevention|detection> — <action> — Approval: <required|approved by <name>|n/a> — State: <proposed|approved|applied|verified>`, or `none — <reason>`. A bare `none` is invalid.
 10. `OPEN QUESTIONS:` with lines `- <question>`, or `none`. Nothing follows this section.
 
 ### SRE.log ↔ Worklog Cross-Reference
