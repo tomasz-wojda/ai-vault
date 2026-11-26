@@ -53,6 +53,11 @@ Before submitting any contribution:
 - [ ] Clarify `[ ]`, `[~]`, `[x]` checkbox semantics
 - [ ] Add any new review criteria or risk flags
 
+### SRE Incident Changes
+
+- [ ] Update the `SRE.log` entry format in `skills/jira-worklog-processor/worklog-reference.md` if needed
+- [ ] Keep `append_sre_log.py` validation in step with that format and run its tests
+
 ### CI/CD & Tooling (`jenkins-pipeline-architect/`)
 
 - [ ] Run `skills/jenkins-pipeline-architect/scripts/syntax_check.sh` before committing

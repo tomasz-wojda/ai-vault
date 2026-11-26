@@ -23,6 +23,10 @@ HOOK_LINKS = {
     "ticket-sync-file-edit.py": "record-ticket-sync-edit.py",
     "ticket-sync-capture-response.py": "capture-ticket-sync-response.py",
     "ticket-sync-require-sync.py": "require-ticket-sync.py",
+    "sre-log-baseline.py": "capture-sre-log-prompt.py",
+    "sre-log-skill-read.py": "record-sre-skill-read.py",
+    "sre-log-capture-response.py": "capture-sre-log-response.py",
+    "sre-log-require-entry.py": "require-sre-log-entry.py",
 }
 LEGACY_HOOK_LINKS = {
     "ai-vault-guard-git.py": "guard-git-mutations.py",

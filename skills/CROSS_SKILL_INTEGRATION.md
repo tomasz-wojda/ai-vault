@@ -1,18 +1,19 @@
 # Cross-Skill Integration Guide
 
-This document establishes the interaction model, handoff protocols, and unified architecture for the five skills in `ai-vault`:
+This document establishes the interaction model, handoff protocols, and unified architecture for the six skills in `ai-vault`:
 
 1. `developer-protocol` (Mode Discipline & Execution Safety)
 2. `devops-daily-protocol` (Operational Lifecycle Shell & Tool Contracts)
 3. `jira-worklog-processor` (Worklog Content Generation & Structuring)
 4. `jenkins-pipeline-architect` (CI/CD Pipeline & Scripted Jenkinsfile Patterns)
 5. `pr-review-comments` (PR Comment Authoring & Local Remediation)
+6. `sre-incident-investigation` (Incident Investigation & SRE.log)
 
 ---
 
 ## 1. The Skill Stack
 
-Three governing layers, then two specialists invoked by surface rather than
+Three governing layers, then three specialists invoked by surface rather than
 stacked on each other:
 
 ```
@@ -30,11 +31,15 @@ stacked on each other:
 │ jenkins-pipeline-architect      │ pr-review-comments              │
 │ CI/CD Specialist                │ PR Comment Specialist           │
 │ (Jenkinsfile, CPS, syntax check)│ (comments, suggestions, fixes)  │
-└─────────────────────────────────┴─────────────────────────────────┘
+├─────────────────────────────────┴─────────────────────────────────┤
+│ Layer 6: sre-incident-investigation                               │
+│ Incident Specialist                                               │
+│ (triage, hypotheses, RCA, SRE.log)                                │
+└───────────────────────────────────────────────────────────────────┘
 ```
 
-L4 and L5 are peers. Neither constrains the other, and a session may activate
-one, both, or neither.
+L4, L5 and L6 are peers. None constrains another, and a session may activate
+any combination of them or none.
 
 ### Layer Responsibilities
 
@@ -42,23 +47,24 @@ one, both, or neither.
 |-------|-------|------|---------|
 | **L1** | `developer-protocol` | Mode state machine (RESEARCH/INNOVATE/PLAN/EXECUTE) | What actions are allowed at any given time |
 | **L2** | `devops-daily-protocol` | Tool contracts (JIRA CLI, New Relic operator, kubectl), Write Gate Protocol, prompt.log | When and how tools are invoked, safety enforcement |
-| **L3** | `jira-worklog-processor` | Worklog content patterns, worklog.template, PR.log, ticket-pickup.prompt | What goes inside worklog files, content quality |
+| **L3** | `jira-worklog-processor` | Worklog content patterns, worklog.template, PR.log, SRE.log entry format, ticket-pickup.prompt | What goes inside worklog files, content quality |
 | **L4** | `jenkins-pipeline-architect` | Jenkinsfile patterns, CPS rules, syntax_check.groovy, postJiraComment | How CI/CD pipelines are structured and validated |
 | **L5** | `pr-review-comments` | Evidence bars, concise comment structure, severity calibration, suggested changes, the gated `APPROVE`/`REQUEST_CHANGES` review submission, local remediation, the `POSTED COMMENTS`, `NOT POSTED` and `SUBMITTED REVIEW` blocks of PR.log | How a review finding is proven, worded and anchored on GitHub, which review state follows from it, and how an explicitly requested fix is prepared in the corresponding clone |
+| **L6** | `sre-incident-investigation` | Incident triage and impact, architecture-aware hypothesis testing, root-cause assessment, remediation recommendations, the content of each SRE.log entry | How a production incident is investigated from symptom to evidence-backed cause and what each invocation records |
 
 ### Inter-Layer Communication Rules
 
 1. **Higher layers constrain lower layers** — L1 mode rules override L2/L3/L4/L5 actions
 2. **Lower layers never override higher layers** — L4 and L5 cannot bypass L1 mode restrictions
-3. **Sibling layers coordinate via handoffs** — L2↔L3, L2↔L4, L3↔L4 and L3↔L5 compose through the rules in section 2, not through direct calls
-4. **All write operations route through L2** — L4 pipeline edits and L5 PR.log appends both use L2's Write Gate Protocol
-5. **Specialists do not call each other** — L4 and L5 are peers; where a PR touches pipeline code, L3 sequences them (see 2.9)
+3. **Sibling layers coordinate via handoffs** — L2↔L3, L2↔L4, L3↔L4, L3↔L5, L2↔L6 and L3↔L6 compose through the rules in section 2, not through direct calls
+4. **All write operations route through L2** — L4 pipeline edits and L5 PR.log appends both use L2's Write Gate Protocol; L6 SRE.log appends are the R-31 exception
+5. **Specialists do not call each other** — L4, L5 and L6 are peers; where a PR touches pipeline code, L3 sequences them (see 2.12)
 
 ---
 
 ## 2. Inter-Layer Rules
 
-Twenty-nine rules, grouped by the concern they govern. Each states a constraint
+Thirty-one rules, grouped by the concern they govern. Each states a constraint
 that binds at decision time. The skill named as owner holds the canonical
 statement of the rule; this document fixes how the layers compose and which rule
 wins when two of them collide.
@@ -72,8 +78,8 @@ wins when two of them collide.
 
 ### 2.2 Write Routing — owner `devops-daily-protocol`
 
-- **R-05** Every write routes through the Write Gate: file creation and edits, HTTP POST/PUT/DELETE, git operations, Tempo submission, and `--apply` on any framework command. L3 worklog edits, L4 pipeline edits and L5 PR.log appends are not exempt. Ticket sync under R-29 is the only exception.
-- **R-06** The gate's five steps map onto modes — ANNOUNCE, PREVIEW and WAIT belong to PLAN; EXECUTE and VERIFY belong to EXECUTE. User approval does not substitute for `MODE: EXECUTE`. Ticket sync under R-29 skips PREVIEW and WAIT and runs in any mode.
+- **R-05** Every write routes through the Write Gate: file creation and edits, HTTP POST/PUT/DELETE, git operations, Tempo submission, and `--apply` on any framework command. L3 worklog edits, L4 pipeline edits and L5 PR.log appends are not exempt. Ticket sync under R-29 and the SRE.log append under R-31 are the only exceptions.
+- **R-06** The gate's five steps map onto modes — ANNOUNCE, PREVIEW and WAIT belong to PLAN; EXECUTE and VERIFY belong to EXECUTE. User approval does not substitute for `MODE: EXECUTE`. Ticket sync under R-29 skips PREVIEW and WAIT and runs in any mode. So does the SRE.log append under R-31.
 - **R-07** One gate is active at a time. A mode switch mid-gate cancels it, and the operation is re-evaluated in the new mode.
 - **R-08** Credential files are referenced by path and never read for their values, in any mode.
 
@@ -102,7 +108,7 @@ wins when two of them collide.
 
 ### 2.6 Precedence
 
-- **R-23** Where rules conflict, precedence runs safety, then mode, then content, then style. Concretely: the Write Gate's WAIT step is a safety requirement and is outside the scope of the `.rules` §5 prohibition on questions. A confirmation prompt before a write is mandatory regardless of response-style directives, except for ticket sync under R-29.
+- **R-23** Where rules conflict, precedence runs safety, then mode, then content, then style. Concretely: the Write Gate's WAIT step is a safety requirement and is outside the scope of the `.rules` §5 prohibition on questions. A confirmation prompt before a write is mandatory regardless of response-style directives, except for ticket sync under R-29 and the SRE.log append under R-31.
 
 ### 2.7 Runtime Precondition
 
@@ -122,7 +128,12 @@ wins when two of them collide.
 
 - **R-29** After a turn that touches a ticket with an active worklog — `worklog/*_<KEY>*.log` at the top level, not in `done/` — the agent updates that ticket's worklog and its existing structured state in any mode, without the Write Gate's PREVIEW and WAIT steps. Analytical sections keep the R-09 mode mapping; structural sections, OPEN DECISIONS, BLOCKERS, NEXT ACTION and one ACTION LOG entry may be written in any mode. State changes use `ai-worklog state ... --apply` only where `.ai-worklog/state/<KEY>.json` exists. The response ends with a `Ticket sync:` line naming each written section and applied state command, and VERIFY still applies. Worklog creation, `state init`, `closeout.*` state paths, TIME LOGGED, archival to `done/`, Tempo, `PR.log`, repository files and every external write stay fully gated. In Cursor the harness `stop` hook enforces the rule with one follow-up turn per generation for each touched key whose worklog was not edited; a key counts as touched when the user names it in the prompt, when the turn edits its worklog, or when the reply names a key the conversation is already bound to through an earlier prompt or worklog edit.
 
-### 2.11 Composite Sequences
+### 2.11 SRE Incident Investigation — owner `sre-incident-investigation`
+
+- **R-30** A production incident activates L6 alongside L2 and L3; that covers the symptoms listed under L2's Production incidents routine. L6 drives triage, architecture reconstruction, ranked falsifiable hypotheses and the root-cause assessment. L2 supplies every diagnostic through its read-only contracts (R-03), and L3 formats the incident worklog FINDINGS when a worklog exists. Diagnostics never change production state. Remediation follows INNOVATE, PLAN and EXECUTE through L2's Write Gate, and approval from a user or incident commander does not replace `MODE: EXECUTE` (R-06). "Confirmed" requires direct evidence for the mechanism.
+- **R-31** Every L6 invocation ends with one entry appended to the workspace-root `SRE.log`, in any mode and without PREVIEW or WAIT. L3 owns the format, L6 the content, and L2 the lifecycle. The entry is written to `tmp/<key>/` and appended only through `append_sre_log.py`, which validates it and never rewrites the file. Entries carry no secrets, tokens or customer data. A turn that only reads or edits the skill files ends with `No SRE log entry needed.` In Cursor the harness `stop` hook sends one follow-up per generation when the skill was invoked — its `SKILL.md` was read, or the prompt named it — and `SRE.log` did not grow.
+
+### 2.12 Composite Sequences
 
 The rules above compose into three recurring sequences. Each step names the
 owning layer.
@@ -152,12 +163,14 @@ EXECUTE, verifies the corresponding clone and remote, prepares a focused branch
 from the pinned PR head, validates and stages only the intended files, and
 returns semantic commit metadata without committing or pushing (R-27).
 
-**Incident response.** RESEARCH throughout triage. L2 queries New Relic
-violations, issues and deployments, plus `kubectl`, and runs any catalog-matched
-`diag` pack. Where a deployment correlates with the alert, L4 inspects the
-deploying pipeline — correlation is recorded with its uncertainty, not as cause.
-L3 opens an incident worklog with FINDINGS and `_raw.log` companions (R-11).
-Mitigation then follows the mode sequence from INNOVATE onward.
+**Incident response.** RESEARCH throughout triage. L6 activates (R-30) and
+loads prior `SRE.log` entries for the incident key. L2 runs New Relic, `kubectl`
+and catalog-matched `diag` packs on the questions L6's hypotheses pose. Where a
+deployment correlates with the alert, L4 inspects the deploying pipeline —
+correlation is recorded with its uncertainty, not as cause. L3 opens an incident
+worklog with FINDINGS and `_raw.log` companions (R-11) and links the SRE.log
+entry. Mitigation then follows the mode sequence from INNOVATE onward. Each L6
+invocation ends with its SRE.log entry (R-31).
 
 ---
 
@@ -197,6 +210,7 @@ Mitigation then follows the mode sequence from INNOVATE onward.
 | `worklog/tickets.log` | `devops-daily-protocol` | `devops-daily-protocol` | All skills |
 | `prompt.log` | All skills (append-only) | `devops-daily-protocol` | All skills |
 | `PR.log` | `jira-worklog-processor` (entry format); `pr-review-comments` (`POSTED COMMENTS`, `NOT POSTED`, `SUBMITTED REVIEW`, follow-up blocks) | `devops-daily-protocol` through Write Gates | All skills |
+| `SRE.log` | `jira-worklog-processor` (entry format); `sre-incident-investigation` (entry content) | `devops-daily-protocol`, appended under R-31 without PREVIEW or WAIT | All skills |
 | GitHub PR review comments | `pr-review-comments` | GitHub | `pr-review-comments` (re-read rather than recalled) |
 | GitHub PR review state (`APPROVED`, `CHANGES_REQUESTED`) | `pr-review-comments` | GitHub, through a dedicated Write Gate | `pr-review-comments` (re-read rather than recalled) |
 | `worklog.template` | `jira-worklog-processor` | User-maintained | `jira-worklog-processor` |
@@ -215,6 +229,7 @@ Mitigation then follows the mode sequence from INNOVATE onward.
 2. **Worklog files** — only one skill writes at a time; `devops-daily-protocol` manages file locks via Write Gate sequencing
 3. **Template files** (`worklog.template`, `ticket-pickup.prompt`) — agent reads only, user maintains
 4. **`_raw.log` files** — excluded from `verify` scanning and Tempo correlation
+5. **`SRE.log`** is append-only — entries are added only through `append_sre_log.py`; no skill edits or deletes existing entries
 
 ---
 
@@ -250,20 +265,21 @@ When a user prompt is received, evaluate in sequence:
 
 ### Activation Matrix Quick Reference
 
-| User Says | L1 | L2 | L3 | L4 | L5 |
-|-----------|----|----|----|----|----|
-| "what should I work on?" | ✅ RESEARCH | ✅ Day Start | ○ | ○ | ○ |
-| "pick up DEVOPS-123" | ✅ RESEARCH→PLAN | ✅ Ticket Pickup | ✅ Create worklog | ○ | ○ |
-| "investigate the OOM issue" | ✅ RESEARCH | ✅ Investigation | ✅ Format FINDINGS | ○ | ○ |
-| "the Jenkins build failed" | ✅ RESEARCH | ✅ Investigation | ✅ Format FINDINGS | ✅ Pipeline analysis | ○ |
-| "create a Jenkinsfile for deploy" | ✅ Full cycle | ○ | ○ | ✅ Pipeline creation | ○ |
-| "review PR #45" | ✅ RESEARCH | ○ | ✅ PR Review | ✅ If PR has Jenkinsfile | ○ |
-| "comment finding 2 in <PR URL>" | ✅ RESEARCH | ✅ Gates the PR.log append | ✅ Owns the PR.log entry | ○ | ✅ Prove, author, post |
-| "log 2 hours on DEVOPS-123" | ✅ EXECUTE | ✅ Ticket Done | ✅ Time logging | ○ | ○ |
-| "end of day summary" | ✅ RESEARCH | ✅ Day End | ○ | ○ | ○ |
-| "MODE: PLAN" | ✅ Transition | ○ | ○ | ○ | ○ |
-| "refactor this function" | ✅ Full cycle | ○ | ○ | ○ | ○ |
-| "PR #45 merged" | ✅ EXECUTE | ○ | ✅ Merge follow-up | ○ | ✅ Follow-up outcomes |
+| User Says | L1 | L2 | L3 | L4 | L5 | L6 |
+|-----------|----|----|----|----|----|----|
+| "what should I work on?" | ✅ RESEARCH | ✅ Day Start | ○ | ○ | ○ | ○ |
+| "pick up DEVOPS-123" | ✅ RESEARCH→PLAN | ✅ Ticket Pickup | ✅ Create worklog | ○ | ○ | ○ |
+| "investigate the OOM issue" | ✅ RESEARCH | ✅ Investigation | ✅ Format FINDINGS | ○ | ○ | ✅ Triage, hypotheses, SRE.log |
+| "PROD 5xx alert on <service>" | ✅ RESEARCH | ✅ Investigation | ✅ Incident worklog FINDINGS | ✅ If a deployment correlates | ○ | ✅ Triage, hypotheses, RCA, SRE.log |
+| "the Jenkins build failed" | ✅ RESEARCH | ✅ Investigation | ✅ Format FINDINGS | ✅ Pipeline analysis | ○ | ○ |
+| "create a Jenkinsfile for deploy" | ✅ Full cycle | ○ | ○ | ✅ Pipeline creation | ○ | ○ |
+| "review PR #45" | ✅ RESEARCH | ○ | ✅ PR Review | ✅ If PR has Jenkinsfile | ○ | ○ |
+| "comment finding 2 in <PR URL>" | ✅ RESEARCH | ✅ Gates the PR.log append | ✅ Owns the PR.log entry | ○ | ✅ Prove, author, post | ○ |
+| "log 2 hours on DEVOPS-123" | ✅ EXECUTE | ✅ Ticket Done | ✅ Time logging | ○ | ○ | ○ |
+| "end of day summary" | ✅ RESEARCH | ✅ Day End | ○ | ○ | ○ | ○ |
+| "MODE: PLAN" | ✅ Transition | ○ | ○ | ○ | ○ | ○ |
+| "refactor this function" | ✅ Full cycle | ○ | ○ | ○ | ○ | ○ |
+| "PR #45 merged" | ✅ EXECUTE | ○ | ✅ Merge follow-up | ○ | ✅ Follow-up outcomes | ○ |
 
 ---
 
@@ -297,6 +313,7 @@ When a user prompt is received, evaluate in sequence:
 | `gh` CLI not authenticated | `jira-worklog-processor` | PR review workflow fails gracefully. Log error, suggest `gh auth login`. |
 | `syntax_check` JDK error | `jenkins-pipeline-architect` | JDK newer than the script's `MAX_JDK` ceiling. Suggest running `skills/jenkins-pipeline-architect/scripts/syntax_check.sh`, or setting `JAVA_HOME` to an install at or below it. |
 | Artifactory Storage API timeout | `jenkins-pipeline-architect` | Active Choice parameter returns fallback: `["ERROR: timeout", "1.0.0"]`. |
+| `append_sre_log.py` rejects the entry | `sre-incident-investigation` | Fix the reported violation in the entry file and rerun; the log is unchanged on failure. |
 
 ### 5.4 Prompt.log Conflicts
 
@@ -397,3 +414,4 @@ CHECK 3: Is the Jenkinsfile a valid Groovy file?
 | 3.6 | 2026-09-21 | Extended L5 with concise production-ready comments, verified one-click suggested changes, and opt-in local remediation in corresponding repos clones without commits or pushes. |
 | 3.7 | 2026-09-23 | Added R-28: commit handoffs are generated once per repository and only for paths changed during the current agent generation. Clean and external-only work produces no Git commands. |
 | 3.8 | 2026-10-14 | Added R-29: ticket sync updates the active worklog and existing structured state after each turn without PREVIEW or WAIT, in any mode, enforced in Cursor by a harness stop hook. Amended R-05, R-06, R-09, R-20 and R-23 accordingly. |
+| 3.9 | 2026-11-26 | Added `sre-incident-investigation` as L6, a peer specialist to L4 and L5. New §2.11 with R-30 and R-31, SRE.log in the artifact table and conflict rules, an L6 activation column, and the incident response sequence routed through L6. Amended R-05, R-06 and R-23 for the R-31 exception. |

@@ -603,6 +603,41 @@ When a PR relates to a worklog:
 | Config change | Maybe | Right-sizing, env correctness, PDB impact |
 | Cleanup/deletion | Rarely | Scope completeness, residual references |
 
+## Incident Tracking Patterns
+
+### SRE.log
+
+`SRE.log` lives at the workspace root, is gitignored, and is append-only.
+
+- Each invocation of `sre-incident-investigation` adds exactly one entry, under R-31.
+- Entries are appended only through `skills/sre-incident-investigation/scripts/append_sre_log.py`.
+- **Split on the `--- YYYY-MM-DDTHH:MM ---` header** when parsing.
+- Entries never contain secret values, tokens or customer data.
+
+### SRE.log Entry Format
+
+Fields in this exact order:
+
+1. Header: `--- YYYY-MM-DDTHH:MM ---`, local time, the same as PR.log.
+2. `INCIDENT <key> | <environment> | <service or workflow>`. The key is the Jira key when a worklog exists. Otherwise it is the New Relic issue or violation ID, and failing that a slug `<service>-<YYYYMMDD>`.
+3. `Mode: <RESEARCH|INNOVATE|PLAN|EXECUTE>   Worklog: <worklog path|none>`.
+4. A blank line.
+5. `SUMMARY:` with three lines:
+   - `Status: <investigating|mitigating|monitoring|resolved>   Severity: <value|unassigned>`
+   - `Start (UTC): <ts|unknown>   Detected (UTC): <ts|unknown>`
+   - `Impact: <measured impact, with estimates labelled>`
+6. `EVIDENCE:` with numbered lines `<n>. <source> — <query or command> — <observation> (<UTC ts>)`, or `none`.
+7. `HYPOTHESES:` with lines `H<n> <untested|supported|weakened|rejected|confirmed> <low|medium|high> — <If X, then Y because Z> — Test: <test> — Result: <result|untested>`, or `none`.
+8. `ROOT CAUSE: <confirmed|most likely|probable|undetermined> — <causal chain|not established>` on one line.
+9. `ACTIONS:` with lines `- <mitigation|corrective|prevention|detection> — <action> — Approval: <required|approved by <name>|n/a> — State: <proposed|approved|applied|verified>`, or `none`.
+10. `OPEN QUESTIONS:` with lines `- <question>`, or `none`. Nothing follows this section.
+
+### SRE.log ↔ Worklog Cross-Reference
+
+- The `Worklog:` line names the incident worklog.
+- The worklog's FINDINGS item cites the SRE.log entry by header timestamp and key.
+- Applied or verified actions get one ACTION LOG line: `YYYY-MM-DD HH:MM - SRE.log <key> <timestamp>: <action> <state>`.
+
 ## Jira Companion Files (_jira.log)
 
 Raw JIRA exports saved separately when ticket data is large:

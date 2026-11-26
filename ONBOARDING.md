@@ -267,8 +267,8 @@ directive in `.rules` §5 (see `skills/CROSS_SKILL_INTEGRATION.md` R-23).
 - `integrations/newrelic/newrelic.properties` — NR API keys
 
 The repository `.gitignore` already excludes `**/credentials`, `**/*.properties`,
-`**/cookie`, `worklog/`, `tmp/`, `prompt.log`, and `PR.log`. Verify with
-`git check-ignore -v <path>` before adding any file that may carry a secret.
+`**/cookie`, `worklog/`, `tmp/`, `prompt.log`, `PR.log`, and `SRE.log`. Verify
+with `git check-ignore -v <path>` before adding any file that may carry a secret.
 
 ---
 

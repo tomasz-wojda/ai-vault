@@ -1,7 +1,7 @@
 ---
 name: sre-incident-investigation
-version: "1.0.0"
-description: Use when an SRE, platform, application, or production incident needs investigation; when alerts report elevated 5xx errors, latency, saturation, availability loss, failed deployments, pod or service instability, queue backlogs, database or dependency failures, or unexplained service degradation. Use to reconstruct architecture, develop and test competing hypotheses, identify root causes, and propose evidence-based remediation. Do not use this skill to execute unapproved production changes.
+version: "1.1.0"
+description: Use when an SRE, platform, application, or production incident needs investigation; when alerts report elevated 5xx errors, latency, saturation, availability loss, failed deployments, pod or service instability, queue backlogs, database or dependency failures, or unexplained service degradation. Use to reconstruct architecture, develop and test competing hypotheses, identify root causes, and propose evidence-based remediation. Do not use this skill to execute unapproved production changes. Also use for New Relic violations or issues, OOMKilled or CrashLoopBackOff pods, and production problems found during ticket investigation. Every invocation appends an SRE.log entry.
 ---
 
 # SRE Incident Investigation
@@ -27,6 +27,14 @@ This skill covers incident intake, triage, architecture-aware debugging, hypothe
 - Escalate promptly through the incident process for suspected data loss/corruption, security compromise, safety risk, broad customer impact, payment/authentication outage, or an incident beyond the investigator's permissions or expertise.
 - Follow the organization's severity definitions, incident commander, communication channel, escalation policy, and runbooks when they exist. Do not invent severity levels, owners, or approval authority.
 
+## ai-vault integration
+
+- **Layer:** L6, governed by R-30 and R-31 in [CROSS_SKILL_INTEGRATION.md](../CROSS_SKILL_INTEGRATION.md).
+- **Modes:** steps 1–7 run in RESEARCH under R-03. Remediation options are developed in INNOVATE, the remediation plan in PLAN, and approved actions run in EXECUTE through the Write Gate of [devops-daily-protocol](../devops-daily-protocol/SKILL.md). Approval from the user or an incident commander does not replace `MODE: EXECUTE` (R-06).
+- **Tools:** diagnostics use L2's read-only contracts (`ai-worklog service newrelic` reads, read-only `kubectl`, `ai-worklog diag list` and `ai-worklog diag run`). Credential files are passed by path only (R-08).
+- **Worklog:** when a ticket worklog exists, L3 formats the FINDINGS, and large output goes to a `_raw.log` file (R-11).
+- **SRE.log:** follow R-31 and use the format in [worklog-reference.md](../jira-worklog-processor/worklog-reference.md) § "SRE.log Entry Format".
+
 ## Investigation workflow
 
 ### 1. Establish incident state and impact
@@ -40,6 +48,7 @@ Establish:
 - Symptoms and SLI signals: availability, error rate by class, throughput, p50/p95/p99 latency, saturation, queue age/depth, and relevant business outcomes.
 - Baseline: compare with a suitable healthy period, normal traffic pattern, and unaffected regions/versions/tenants. Account for seasonality and expected traffic changes.
 - Severity and urgency using the organization's policy. If no policy is known, report observable impact and state that severity is not assigned.
+- Prior entries for the incident key: `rg -n "^INCIDENT <key> " SRE.log`.
 
 Do not focus only on the alert. Determine whether the alert reflects customer impact, an internal component symptom, telemetry failure, or a false positive.
 
@@ -165,6 +174,13 @@ For an active incident, provide a short status update when material evidence cha
 
 If investigation is blocked, state exactly what evidence or access is missing, why it matters, and the smallest next step to obtain it. Continue with available evidence rather than repeatedly asking for information already supplied.
 
+### 10. Record the invocation in SRE.log
+
+1. Write the entry with the Write tool to `tmp/<key>/sre-log-<YYYYMMDDTHHMM>.txt`.
+2. From the workspace root, run `python3 repos/ai-vault/skills/sre-incident-investigation/scripts/append_sre_log.py --entry <that file>`.
+3. This happens in any mode, without PREVIEW or WAIT. If the append is rejected, fix the entry and rerun.
+4. A turn that only reads or edits the skill files ends with `No SRE log entry needed.` instead.
+
 ## Required final deliverable
 
 Use `references/output-templates.md`. At minimum, report:
@@ -190,3 +206,4 @@ Load only the references needed for the current incident:
 - `references/output-templates.md` — active incident updates, investigation report, hypothesis matrix, and RCA format.
 - `references/worked-examples.md` — illustrative end-to-end investigations.
 - `references/further-reading.md` — primary SRE, cloud operations, and observability references.
+- [worklog-reference.md](../jira-worklog-processor/worklog-reference.md) § "SRE.log Entry Format" — the SRE.log entry fields and their order.

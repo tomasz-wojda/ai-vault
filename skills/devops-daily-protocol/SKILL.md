@@ -1,6 +1,6 @@
 ---
 name: devops-daily-protocol
-version: "1.5.0"
+version: "1.6.0"
 description: >-
   Orchestrates daily DevOps operations: pulling JIRA tickets, selecting work items,
   creating structured worklog files, integrating ai-worklog and New Relic monitoring,
@@ -12,7 +12,7 @@ description: >-
 
 ## Safety Rules
 All operations are **read-only by default**. Any write operation requires the Write Gate Protocol (section below).
-Ticket sync ([CROSS_SKILL_INTEGRATION.md](../CROSS_SKILL_INTEGRATION.md) R-29) is the one exception: after a turn that touches a ticket with an active worklog, update that worklog and its existing structured state directly, in any mode, and end the response with a `Ticket sync:` line.
+Ticket sync ([CROSS_SKILL_INTEGRATION.md](../CROSS_SKILL_INTEGRATION.md) R-29) is one exception: after a turn that touches a ticket with an active worklog, update that worklog and its existing structured state directly, in any mode, and end the response with a `Ticket sync:` line. The SRE.log append (R-31) is the other: every `sre-incident-investigation` invocation appends one entry through that skill's `append_sre_log.py`, in any mode.
 
 Write operations include:
 - Creating or editing files (worklog files, raw logs)
@@ -195,6 +195,8 @@ Steps:
 ### ROUTINE: Investigation
 Trigger: user is actively working on a ticket — researching, querying, analyzing.
 This mode supports the user during active investigation. Use tools as needed:
+
+**Production incidents**: alerts, elevated 5xx errors or latency, saturation, availability loss, failed deployments, pod or service instability, and dependency failures activate [sre-incident-investigation](../sre-incident-investigation/SKILL.md) (R-30). That skill drives triage, hypotheses and the root cause; this routine supplies the tools. Each invocation ends with an SRE.log entry (R-31).
 
 **New Relic investigation patterns**:
 - Open violations: `ai-worklog service newrelic violations`

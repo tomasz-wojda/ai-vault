@@ -9,6 +9,10 @@
       {
         "command": ".cursor/hooks/ticket-sync-baseline.py",
         "failClosed": false
+      },
+      {
+        "command": ".cursor/hooks/sre-log-baseline.py",
+        "failClosed": false
       }
     ],
     "beforeShellExecution": [
@@ -29,6 +33,11 @@
         "command": ".cursor/hooks/git-handoff-shell-attribution.py",
         "failClosed": true,
         "matcher": "Shell"
+      },
+      {
+        "command": ".cursor/hooks/sre-log-skill-read.py",
+        "failClosed": false,
+        "matcher": "Read"
       }
     ],
     "postToolUseFailure": [
@@ -56,6 +65,10 @@
       {
         "command": ".cursor/hooks/ticket-sync-capture-response.py",
         "failClosed": false
+      },
+      {
+        "command": ".cursor/hooks/sre-log-capture-response.py",
+        "failClosed": false
       }
     ],
     "stop": [
@@ -66,6 +79,11 @@
       },
       {
         "command": ".cursor/hooks/ticket-sync-require-sync.py",
+        "failClosed": false,
+        "loop_limit": 1
+      },
+      {
+        "command": ".cursor/hooks/sre-log-require-entry.py",
         "failClosed": false,
         "loop_limit": 1
       }

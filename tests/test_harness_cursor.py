@@ -1333,6 +1333,13 @@ class InstallerTest(unittest.TestCase):
                 "require-sync",
             ):
                 self.assertIn(f"hooks/ticket-sync-{name}.py", commands)
+            for name in (
+                "baseline",
+                "skill-read",
+                "capture-response",
+                "require-entry",
+            ):
+                self.assertIn(f"hooks/sre-log-{name}.py", commands)
             with mock.patch.object(Path, "home", return_value=home):
                 repeated, repeated_hooks, repeated_path = installer.plan_install(
                     "user",
@@ -1400,6 +1407,18 @@ class InstallerTest(unittest.TestCase):
             self.assertIn(
                 ".cursor/hooks/ticket-sync-require-sync.py",
                 commands,
+            )
+            self.assertIn(
+                ".cursor/hooks/sre-log-require-entry.py",
+                commands,
+            )
+            self.assertIn(
+                {
+                    "command": ".cursor/hooks/sre-log-skill-read.py",
+                    "failClosed": False,
+                    "matcher": "Read",
+                },
+                installed["hooks"]["postToolUse"],
             )
             self.assertEqual(
                 installed["hooks"]["preToolUse"][0]["matcher"],

@@ -1,6 +1,6 @@
 ---
 name: jira-worklog-processor
-version: "1.5.0"
+version: "1.6.0"
 description: >-
   Process JIRA tickets into structured worklog files following a multi-phase
   research-first workflow. Extends devops-daily-protocol with content generation
@@ -424,6 +424,11 @@ If no worklog is found for the ticket key (or no ticket key in the PR):
 - Skip WORKLOG CROSS-REFERENCE section
 - Review the PR on its own merits: correctness, risk, scope, missing tests
 - Note in OBSERVATIONS: "No worklog found for this PR"
+
+## SRE.log
+
+SRE.log is the incident counterpart of PR.log, appended by `sre-incident-investigation` under R-31.
+Its format is in [worklog-reference.md](worklog-reference.md) § "SRE.log Entry Format".
 
 ## Phase 6: Completion
 
