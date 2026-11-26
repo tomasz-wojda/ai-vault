@@ -58,6 +58,11 @@ Before submitting any contribution:
 - [ ] Update the `SRE.log` entry format in `skills/jira-worklog-processor/worklog-reference.md` if needed
 - [ ] Keep `append_sre_log.py` validation in step with that format and run its tests
 
+### Security Audit Changes
+
+- [ ] Keep `validate_findings.py` and `validate_coverage_ledger.py` in step with `references/report-schema.json` and the ledger contract in `references/reconnaissance.md`
+- [ ] Run the skill's tests with `python3 -m unittest discover -s skills/security-audit/tests -p 'test_*.py'`
+
 ### CI/CD & Tooling (`jenkins-pipeline-architect/`)
 
 - [ ] Run `skills/jenkins-pipeline-architect/scripts/syntax_check.sh` before committing

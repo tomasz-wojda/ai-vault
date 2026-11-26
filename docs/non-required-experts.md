@@ -1,6 +1,6 @@
 # Non-Required Expert Skills
 
-Status: proposed, not implemented
+Status: proposed; `security-audit` implemented
 Created: 2026-10-24
 Scope: `ai-vault` (`skills/`, `skills/manifest.json`)
 
@@ -33,7 +33,7 @@ An expert skill meets all three rules below.
 | Expert | Scope |
 | --- | --- |
 | `database` | Schema and index review, query plans, migrations and rollback, locking and isolation, backup and restore checks, engine-specific settings for MySQL and PostgreSQL |
-| `security` | Secret handling, dependency CVE triage, IAM and least privilege, container image hardening, security findings in PR review |
+| `security-audit` | Source-first vulnerability audit and guidance (Cloudflare security-audit-skill); secret handling, dependency CVE triage, IAM and least privilege, container image hardening, CI and infrastructure-as-code security; shipped-artifact evidence through REA |
 | `kubernetes` | Manifests and Helm values, Argo CD sync behaviour, resource requests and limits, probes |
 | `networking` | DNS, TLS certificates, load balancers, firewall and security-group rules |
 | `observability` | New Relic queries, alert thresholds, SLOs |

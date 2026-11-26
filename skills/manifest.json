@@ -60,6 +60,12 @@
       "dir": "sre-incident-investigation",
       "required": false,
       "ides": ["antigravity", "claude", "cursor"]
+    },
+    {
+      "name": "security-audit",
+      "dir": "security-audit",
+      "required": false,
+      "ides": ["antigravity", "claude", "cursor"]
     }
   ]
 }
