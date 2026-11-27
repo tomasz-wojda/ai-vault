@@ -1,6 +1,6 @@
 ---
 name: sre-incident-investigation
-version: "2.0.0"
+version: "2.1.0"
 description: Use when an SRE, platform, application, or production incident needs investigation; when alerts report elevated 5xx errors, latency, saturation, availability loss, failed deployments, pod or service instability, queue backlogs, database or dependency failures, or unexplained service degradation. Use to reconstruct architecture, develop and test competing hypotheses, identify root causes, and propose evidence-based remediation. Do not use this skill to execute unapproved production changes. Also use for New Relic violations or issues, OOMKilled or CrashLoopBackOff pods, and production problems found during ticket investigation. Every invocation appends an SRE.log entry.
 ---
 
@@ -30,11 +30,12 @@ This skill covers incident intake, triage, architecture-aware debugging, hypothe
 ## ai-vault integration
 
 - **Layer:** L6, governed by R-30 and R-31 in [CROSS_SKILL_INTEGRATION.md](../CROSS_SKILL_INTEGRATION.md).
-- **Modes:** steps 1–7 run in RESEARCH under R-03. Remediation options are developed in INNOVATE, the remediation plan in PLAN, and approved actions run in EXECUTE through the Write Gate of [devops-daily-protocol](../devops-daily-protocol/SKILL.md). Approval from the user or an incident commander does not replace `MODE: EXECUTE` (R-06).
+- **Modes:** read-only diagnostics are R-03 reads and run in every mode. Steps 1–7 belong to RESEARCH, remediation options to INNOVATE, the remediation plan to PLAN, and approved actions run in EXECUTE through the Write Gate of [devops-daily-protocol](../devops-daily-protocol/SKILL.md). Approval from the user or an incident commander does not replace `MODE: EXECUTE` (R-06). Phases change on `MODE:` or inside an incident pipeline (R-32).
 - **Tools:** diagnostics use L2's read-only contracts (`ai-worklog service newrelic` reads, read-only `kubectl`, `ai-worklog diag list` and `ai-worklog diag run`). Credential files are passed by path only (R-08).
 - **Worklog:** when a ticket worklog exists, L3 formats the FINDINGS, and large output goes to a `_raw.log` file (R-11).
 - **SRE.log:** follow R-31 and use the format in [worklog-reference.md](../jira-worklog-processor/worklog-reference.md) § "SRE.log Entry Format".
 - **Incident directory:** every incident file lives in `incidents/<key>/` at the workspace root: `report.md`, the `sre-log-*.txt` entry files, `evidence/` (each exact query or command next to its output) and `artifacts/` (boards, screenshots, scripts). Writes there follow the R-31 exception. Incident work does not use `tmp/`.
+- **Shared helpers:** Prometheus ranges use `python3 repos/ai-vault/skills/sre-incident-investigation/scripts/prom_range.py --context <kube context> --out incidents/<key>/evidence/prom ...`. Python HTTPS calls to internal endpoints set `SSL_CERT_FILE` to the bundle written by `scripts/build_ca_bundle.py` (default `~/.cache/ai-vault/ca-bundle.pem`). Helpers are called, never copied into incidents.
 
 ## Investigation workflow
 
@@ -49,7 +50,7 @@ Establish:
 - Symptoms and SLI signals: availability, error rate by class, throughput, p50/p95/p99 latency, saturation, queue age/depth, and relevant business outcomes.
 - Baseline: compare with a suitable healthy period, normal traffic pattern, and unaffected regions/versions/tenants. Account for seasonality and expected traffic changes.
 - Severity and urgency using the organization's policy. If no policy is known, report observable impact and state that severity is not assigned.
-- Prior entries for the incident key or its ticket: `rg -n "^INCIDENT <key> |Ticket: <ticket>$" SRE.log`. Mint the key once, by the rule in [worklog-reference.md](../jira-worklog-processor/worklog-reference.md) § "SRE.log Entry Format".
+- Prior entries for the incident key or its ticket: `rg -n "^INCIDENT <key> |Ticket: <ticket>$" SRE.log`. Mint the key once: the Jira key when the incident arrives with a ticket, otherwise the New Relic issue or violation ID, otherwise `<primary-service>-<YYYYMMDD of the UTC start>` with `-2`, `-3` on collision. The key never changes; the full rule is in [worklog-reference.md](../jira-worklog-processor/worklog-reference.md) § "SRE.log Entry Format".
 
 Do not focus only on the alert. Determine whether the alert reflects customer impact, an internal component symptom, telemetry failure, or a false positive.
 
@@ -155,7 +156,7 @@ Separate:
 
 Declare a root cause **confirmed** only when the causal mechanism is supported by direct evidence, the timeline and affected path fit, and material competing explanations have been tested or reasonably excluded. Otherwise label it **most likely**, **probable**, or **undetermined**, state confidence, and list the evidence needed to confirm it.
 
-Label the trigger separately, with its own certainty and evidence type (`direct` or `correlational`). A root cause is **confirmed** only with a confirmed trigger backed by direct evidence. While the trigger is undetermined, the status is `recovered` once impact ends, never `monitoring` or `resolved`.
+Label the trigger separately, with its own certainty and evidence type (`direct` or `correlational`). A root cause is **confirmed** only with a confirmed trigger backed by direct evidence. While the trigger is undetermined, the status is `recovered` once impact ends, never `monitoring` or `resolved`. Use `recurring` while impact keeps returning and the precondition persists, whatever the trigger label.
 
 A recovery after a change is useful evidence but is not automatically proof: check for concurrent changes, traffic changes, delayed recovery, and regression risk. Multiple interacting root causes are possible.
 
@@ -175,7 +176,7 @@ After an authorized fix is applied, verify recovery against the original impact 
 
 ### 9. Communicate continuously
 
-Keep `incidents/<key>/report.md` current in every investigating turn, using the Investigation report template. Chat carries only what changed.
+Keep `incidents/<key>/report.md` current in every investigating turn, using the Investigation report template. Chat carries only what changed. Before the SRE.log append, run `python3 repos/ai-vault/skills/sre-incident-investigation/scripts/check_report.py --report incidents/<key>/report.md` from the workspace root and fix every violation. `H<n>` in SRE.log equals rank n in report section 5.
 
 For an active incident, provide a short status update when material evidence changes, when the leading hypothesis changes, before a risky proposed action, and at an agreed incident cadence. Separate facts, hypotheses, decisions, and unknowns. Avoid speculation in customer-facing statements.
 
@@ -183,22 +184,38 @@ If investigation is blocked, state exactly what evidence or access is missing, w
 
 ### 10. Record the invocation in SRE.log
 
-1. Write the entry with the Write tool to `incidents/<key>/sre-log-<YYYYMMDDTHHMM>.txt`, taking the timestamp from `date +%Y%m%dT%H%M`.
+1. Write the entry with the Write tool to `incidents/<key>/sre-log-<YYYYMMDDTHHMM>.txt`, taking the timestamp from `date +%Y%m%dT%H%M` (local time, never `date -u`). The append rejects headers more than 15 minutes old and new keys that differ from `Ticket:`.
 2. From the workspace root, run `python3 repos/ai-vault/skills/sre-incident-investigation/scripts/append_sre_log.py --entry <that file>`.
 3. This happens in any mode, without PREVIEW or WAIT. If the append is rejected, fix the entry and rerun.
 4. A turn that only reads or edits the skill files ends with `No SRE log entry needed.` instead.
+
+## Phase gates and incident pipeline
+
+A phase is complete only when its gate passes. `check_report.py` checks structure; the agent checks content.
+
+- **RESEARCH gate:** sections 1–6 filled; every hypothesis has a status; the root cause and trigger are labelled; impact and detection are measured or written as `not measured — <reason>`; the first-turn snapshot is saved.
+- **INNOVATE gate:** every 7.1 row names the hypothesis it addresses, followed by a `Recommended combination:` line.
+- **PLAN gate:** the 7.2 table and implementation checklist, with every production step naming its approval and `MODE: EXECUTE`; 7.3 lists every untested hypothesis and precondition the plan depends on; the report state is PLAN-READY or PLAN-READY-WITH-CONDITIONS.
+
+**Incident pipeline (R-32):**
+- It starts with `PIPELINE: <ticket, alert or incident key>` and is bound to that one incident key.
+- It advances RESEARCH, INNOVATE and PLAN without `MODE:` phrases when each gate passes, declaring the mode in each response.
+- It returns to RESEARCH when new evidence contradicts the root cause.
+- The SRE.log `Mode:` is the mode at the end of the turn.
+- It stops at PLAN-READY or PLAN-READY-WITH-CONDITIONS, at any user `MODE:` phrase, or when blocked; a blocker is written into section 9.
+- It never enters EXECUTE.
 
 ## Required final deliverable
 
 Use `references/output-templates.md`. The deliverable lives in `incidents/<key>/report.md`. At minimum, report:
 
-1. **Incident summary:** current status, severity (or unassigned), affected service/environment, start time (UTC), and customer/business impact.
+1. **Incident summary:** report state and go/no-go, current status, severity (or unassigned), affected service/environment, start time (UTC), and customer/business impact.
 2. **Architecture:** verified Mermaid diagram of the relevant request/job path, dependencies, control plane, and observability path; list unknowns.
 3. **Timeline:** key symptoms, changes, events, tests, mitigations, and recovery markers in UTC.
 4. **Evidence:** sources, exact queries/commands where useful, observations, limitations, and missing telemetry.
 5. **Hypothesis matrix:** ranked candidates, predictions, test, result, status, and confidence.
 6. **Root-cause assessment:** causal chain; root cause, trigger, contributors, propagation, and detection/response gaps; clearly label certainty.
-7. **Remediation plan:** immediate mitigation, corrective fix, preventive work, detection improvements, priorities, risks, approvals, owners (if known), and verification/rollback criteria.
+7. **Remediation:** 7.1 options (INNOVATE); 7.2 plan with immediate mitigation, corrective fix, preventive work, detection improvements, priorities, risks, approvals, owners (if known), verification/rollback criteria and the implementation checklist (PLAN); 7.3 pre-EXECUTE validation listing every test still needed, whether it blocks, and its status.
 8. **Open questions and next actions:** only unresolved items that materially affect diagnosis or safe recovery.
 
 Do not pad the report with generic advice. Every major conclusion must point to evidence. Clearly distinguish observed fact, inference, hypothesis, and recommendation.

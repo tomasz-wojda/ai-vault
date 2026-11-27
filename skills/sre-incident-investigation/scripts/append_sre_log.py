@@ -17,7 +17,7 @@ INCIDENT = re.compile(
 INCIDENT_KEY = re.compile(r"^INCIDENT (\S+) ")
 MODE = re.compile(r"^Mode: (RESEARCH|INNOVATE|PLAN|EXECUTE) +Worklog: \S.*$")
 STATUS = re.compile(
-    r"^Status: (investigating|mitigating|recovered|monitoring|resolved) +Severity: \S.*$"
+    r"^Status: (investigating|mitigating|recovered|recurring|monitoring|resolved) +Severity: \S.*$"
 )
 LABELS = "confirmed|most likely|probable|undetermined"
 ROOT_CAUSE = re.compile(
@@ -27,6 +27,7 @@ ENTRY_NAME = re.compile(r"^sre-log-(\d{8}T\d{4})\.txt$")
 HEADER_FORMAT = "%Y-%m-%dT%H:%M"
 STAMP_FORMAT = "%Y%m%dT%H%M"
 FUTURE_TOLERANCE = timedelta(minutes=5)
+PAST_TOLERANCE = timedelta(minutes=15)
 INCIDENTS_DIR = "incidents"
 SECTIONS = (
     "SUMMARY:",
@@ -49,6 +50,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def read_entry(path: Path) -> bytes:
     return path.read_bytes()
+
+
+def current_time() -> datetime:
+    return datetime.now()
 
 
 def parse_header_time(line: str) -> datetime | None:
@@ -142,6 +147,11 @@ def time_violations(
     violations = []
     if header > now + FUTURE_TOLERANCE:
         violations.append("header time is in the future")
+    if header < now - PAST_TOLERANCE:
+        violations.append(
+            "header time is more than 15 minutes before now; take it from "
+            "local `date`, not `date -u`"
+        )
     latest = latest_header(log, key) if key else None
     if latest and header < latest:
         violations.append(
@@ -151,13 +161,19 @@ def time_violations(
     return violations
 
 
+def key_violations(key: str, ticket: str, log: Path) -> list[str]:
+    if ticket == "none" or key == ticket or latest_header(log, key):
+        return []
+    return [f"a new incident key must equal the ticket {ticket}"]
+
+
 def status_value(lines: list[str]) -> tuple[str | None, list[str]]:
     index = first_line(lines, "Status:")
     match = STATUS.match(lines[index]) if index is not None else None
     if not match:
         return None, [
             "status line must be 'Status: <investigating|mitigating|recovered|"
-            "monitoring|resolved>   Severity: <value|unassigned>'"
+            "recurring|monitoring|resolved>   Severity: <value|unassigned>'"
         ]
     return match.group(1), []
 
@@ -211,10 +227,13 @@ def validate_entry(raw: bytes, entry: Path, log: Path, now: datetime) -> list[st
     header = parse_header_time(lines[0])
     key_match = INCIDENT.match(lines[1]) if len(lines) > 1 else None
     key = key_match.group(1).strip() if key_match else None
+    ticket = key_match.group(4) if key_match else None
     violations = structure_violations(lines)
     violations += path_violations(entry, key, header)
     if header:
         violations += time_violations(header, key, log, now)
+    if key and ticket:
+        violations += key_violations(key, ticket, log)
     status, status_errors = status_value(lines)
     violations += status_errors
     violations += root_cause_violations(lines, status)
@@ -243,7 +262,7 @@ def main(argv: list[str] | None = None) -> int:
     except OSError as error:
         print(f"cannot read entry: {error}", file=sys.stderr)
         return 2
-    violations = validate_entry(raw, args.entry, args.log, datetime.now())
+    violations = validate_entry(raw, args.entry, args.log, current_time())
     if violations:
         for violation in violations:
             print(f"rejected: {violation}", file=sys.stderr)

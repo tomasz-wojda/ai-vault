@@ -4,7 +4,9 @@ import re
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta
 from pathlib import Path
+from unittest import mock
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SKILL_ROOT / "scripts"))
@@ -40,6 +42,13 @@ def entry_name(text):
     return f"sre-log-{stamp}.txt"
 
 
+def default_now(text):
+    match = HEADER_TIME.match(text)
+    if not match:
+        return datetime(2026, 11, 26, 14, 31)
+    return datetime(*map(int, match.groups())) + timedelta(minutes=1)
+
+
 class AppendSreLogTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -49,14 +58,17 @@ class AppendSreLogTests(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
-    def run_main(self, text, directory=None, name=None):
+    def run_main(self, text, directory=None, name=None, now=None):
         folder = directory or self.root / "incidents" / "KD-1234"
         folder.mkdir(parents=True, exist_ok=True)
         entry = folder / (name or entry_name(text))
         entry.write_text(text, encoding="utf-8")
         stdout = io.StringIO()
         stderr = io.StringIO()
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+        clock = mock.patch.object(
+            append_sre_log, "current_time", return_value=now or default_now(text)
+        )
+        with clock, contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
             code = append_sre_log.main(["--entry", str(entry), "--log", str(self.log)])
         return code, stdout.getvalue(), stderr.getvalue()
 
@@ -80,9 +92,9 @@ class AppendSreLogTests(unittest.TestCase):
         self.assertIn(fragment, stderr)
         self.assertEqual(self.log.read_text(encoding="utf-8"), existing)
 
-    def assert_accepted(self, text, existing=""):
+    def assert_accepted(self, text, existing="", **location):
         self.log.write_text(existing, encoding="utf-8")
-        code, _, stderr = self.run_main(text)
+        code, _, stderr = self.run_main(text, **location)
         self.assertEqual(code, 0, stderr)
 
     def test_missing_header_rejected(self):
@@ -117,7 +129,9 @@ class AppendSreLogTests(unittest.TestCase):
 
     def test_future_header_rejected(self):
         self.assert_rejected(
-            VALID_ENTRY.replace("2026-11-26T14:30", "2099-01-01T00:00"), "in the future"
+            VALID_ENTRY.replace("2026-11-26T14:30", "2099-01-01T00:00"),
+            "in the future",
+            now=datetime(2026, 11, 26, 14, 31),
         )
 
     def test_header_earlier_than_same_key_rejected(self):
@@ -175,6 +189,43 @@ class AppendSreLogTests(unittest.TestCase):
 
     def test_recovered_with_undetermined_trigger_accepted(self):
         self.assert_accepted(VALID_ENTRY.replace("Status: investigating", "Status: recovered"))
+
+    def test_header_older_than_tolerance_rejected(self):
+        self.assert_rejected(
+            VALID_ENTRY,
+            "more than 15 minutes before now",
+            now=datetime(2026, 11, 26, 14, 50),
+        )
+
+    def test_header_within_tolerance_accepted(self):
+        self.assert_accepted(VALID_ENTRY, now=datetime(2026, 11, 26, 14, 40))
+
+    def test_new_key_differing_from_ticket_rejected(self):
+        self.assert_rejected(
+            VALID_ENTRY.replace("INCIDENT KD-1234", "INCIDENT checkout-api-20261126"),
+            "must equal the ticket KD-1234",
+            directory=self.root / "incidents" / "checkout-api-20261126",
+        )
+
+    def test_existing_slug_key_with_later_ticket_accepted(self):
+        slug = VALID_ENTRY.replace("INCIDENT KD-1234", "INCIDENT checkout-api-20261126")
+        existing = slug.replace("Ticket: KD-1234", "Ticket: none")
+        self.assert_accepted(
+            slug.replace("14:30", "15:45"),
+            existing=existing,
+            directory=self.root / "incidents" / "checkout-api-20261126",
+        )
+
+    def test_new_slug_key_without_ticket_accepted(self):
+        self.assert_accepted(
+            VALID_ENTRY.replace("INCIDENT KD-1234", "INCIDENT checkout-api-20261126").replace(
+                "Ticket: KD-1234", "Ticket: none"
+            ),
+            directory=self.root / "incidents" / "checkout-api-20261126",
+        )
+
+    def test_recurring_with_undetermined_trigger_accepted(self):
+        self.assert_accepted(VALID_ENTRY.replace("Status: investigating", "Status: recurring"))
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@ Use the shortest template that communicates the current state. During an active 
 
 ```markdown
 ### Incident update — <UTC timestamp>
-- Status: investigating / mitigating / recovered / monitoring / resolved
+- Status: investigating / mitigating / recovered / recurring / monitoring / resolved
 - Severity: <organization-defined value or unassigned>
 - Impact: <verified user/business impact; state estimates explicitly>
 - Affected scope: <service, environment, region/AZ, tenant, route, version>
@@ -31,6 +31,8 @@ Use the shortest template that communicates the current state. During an active 
 # Incident investigation — <incident identifier/title>
 
 ## 1. Executive summary
+- Report state: <RESEARCH|INNOVATE|PLAN-READY|PLAN-READY-WITH-CONDITIONS|EXECUTING|VERIFIED>
+- Go/No-go: <READY|READY WITH CONDITIONS|NOT READY> — <reason>
 - Status:
 - Severity:
 - Start/detection/recovery times (UTC):
@@ -66,8 +68,24 @@ Use the shortest template that communicates the current state. During an active 
 - Remaining uncertainty:
 
 ## 7. Remediation
+
+### 7.1 Options
+| ID | Option | Category | Addresses | Advantages | Disadvantages / risk |
+|---|---|---|---|---|---|
+
+Recommended combination:
+
+### 7.2 Plan
 | Priority | Action | Category | Evidence link | Owner | Risk / approval | Success / rollback criteria |
 |---|---|---|---|---|---|---|
+
+IMPLEMENTATION CHECKLIST:
+1.
+
+### 7.3 Pre-EXECUTE validation
+| ID | Unproven | Ref | Plan step | Test and environment | Owner | Blocking | Status |
+|---|---|---|---|---|---|---|---|
+| V1 | <what is unproven> | H<rank> or plan precondition | <checklist step> | <test, environment> | <owner or unassigned> | yes/no | pending/passed/failed/waived |
 
 ## 8. Recovery verification
 - Original impact signals:
