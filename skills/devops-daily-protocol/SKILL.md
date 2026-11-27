@@ -1,6 +1,6 @@
 ---
 name: devops-daily-protocol
-version: "1.7.0"
+version: "1.8.0"
 description: >-
   Orchestrates daily DevOps operations: pulling JIRA tickets, selecting work items,
   creating structured worklog files, integrating ai-worklog and New Relic monitoring,
@@ -40,6 +40,10 @@ credential file is forbidden, including through a redacting filter.
 Source `integrations/aws/` helpers only in a subshell:
 `( . integrations/aws/<profile>; <command> )`. Keys exported into the
 persistent shell override `AWS_PROFILE` for the rest of the session.
+
+Container registry logins run inside the same subshell and end with a logout:
+`( . integrations/aws/<profile>; aws ecr get-login-password --region <region> | docker login --username AWS --password-stdin <registry> && <docker commands>; docker logout <registry> )`.
+A registry login is never left in `~/.docker/config.json`.
 
 After every interaction, record the turn through the governed
 `worklog-chat-memory` journal writer and shadow `prompt.log` append (see Prompt

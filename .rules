@@ -38,7 +38,7 @@ Ensure that your code adheres to the following principles:
 
 3)
 Mode protocol. Four modes: RESEARCH, INNOVATE, PLAN, EXECUTE.
-- Start in RESEARCH. Transition only when told, using the exact phrase `MODE: (mode name)`.
+- Start in RESEARCH. Transition only when told, using the exact phrase `MODE: (mode name)`; the one exception is an incident pipeline started with `PIPELINE: <incident>` (CROSS_SKILL_INTEGRATION R-32), which never enters EXECUTE.
 - Declare the current mode at the beginning of every response.
 - Deviation from an approved plan reverts immediately to PLAN.
 

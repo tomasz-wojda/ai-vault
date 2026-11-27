@@ -620,15 +620,16 @@ Fields in this exact order:
 
 1. Header: `--- YYYY-MM-DDTHH:MM ---`, local time, the same as PR.log.
    - The entry file is `incidents/<key>/sre-log-<YYYYMMDDTHHMM>.txt` and its timestamp equals the header.
-   - The header is the local time at which the entry is written, read from `date`. It is never later than now and never earlier than the latest entry for the same key.
+   - The header is the local time at which the entry is written, read from `date`, not `date -u`. It is never later than now, never more than 15 minutes before the append, and never earlier than the latest entry for the same key.
 2. `INCIDENT <key> | <environment> | <service or workflow> | Ticket: <Jira key|none>`.
    - The key is minted in the first investigating turn and never changes.
    - It is the Jira key when the incident arrives with a Jira ticket, whether or not a worklog exists. Otherwise it is the New Relic issue or violation ID, and failing that a slug `<primary-service>-<YYYYMMDD>` whose date is the UTC date of the incident start. A slug that already belongs to a different incident in `SRE.log` takes a `-2`, `-3` suffix.
    - A ticket that appears later goes only in `Ticket:`; the key is not changed.
+   - The append rejects a new key that differs from `Ticket:`.
 3. `Mode: <RESEARCH|INNOVATE|PLAN|EXECUTE>   Worklog: <worklog path|none>`.
 4. A blank line.
 5. `SUMMARY:` with three lines:
-   - `Status: <investigating|mitigating|recovered|monitoring|resolved>   Severity: <value|unassigned>`. `recovered` means impact ended while the trigger is undetermined. `monitoring` and `resolved` require a trigger that is not `undetermined`.
+   - `Status: <investigating|mitigating|recovered|recurring|monitoring|resolved>   Severity: <value|unassigned>`. `recovered` means impact ended while the trigger is undetermined. `recurring` means impact keeps returning while the precondition persists, with any trigger label. `monitoring` and `resolved` require a trigger that is not `undetermined`.
    - `Start (UTC): <ts|unknown>   Detected (UTC): <ts|unknown>`
    - `Impact: <measured impact, with estimates labelled>`
 6. `EVIDENCE:` with numbered lines `<n>. <source> — <query or command> — <observation> (<UTC ts>)`, or `none`.

@@ -1,6 +1,6 @@
 ---
 name: developer-protocol
-version: "1.2.0"
+version: "1.3.0"
 description: Enforces a strict multi-mode workflow (RESEARCH, INNOVATE, PLAN, EXECUTE) to ensure codebase integrity and prevent unauthorized modifications.
 ---
 
@@ -10,6 +10,7 @@ When this skill is active, you must adhere to the following strict protocol to a
 ## Protocol
 
 - **Mode Transitions:** - **Restriction:** You will start in 'RESEARCH' mode, and only transition modes when explicitly told by me to change using the exact key phrases `MODE: (mode name)`.
+  - **Exception:** inside an incident pipeline started with `PIPELINE: <incident>` ([CROSS_SKILL_INTEGRATION.md](../CROSS_SKILL_INTEGRATION.md) R-32), RESEARCH, INNOVATE and PLAN advance without `MODE:` phrases when their phase gates pass; EXECUTE still requires `MODE: EXECUTE`.
   - **Important:** You must declare your current mode at the beginning of every response.
 
 - **Modes and Their Rules:**
@@ -66,7 +67,7 @@ This skill acts as the **governance layer (Layer 1)** across all sibling skills:
 
 - **Overlay on `devops-daily-protocol`:**  
   When `devops-daily-protocol` is active:
-  - `RESEARCH` mode aligns with Day Start and early Investigation Mode (read-only queries, NRQL, kubectl).
+  - `RESEARCH` mode aligns with Day Start and early Investigation Mode. Read-only queries, NRQL and kubectl are R-03 reads, allowed in every mode.
   - `INNOVATE` mode aligns with evaluating solution options before writing to worklogs.
   - `PLAN` mode aligns with constructing `PROPOSED ACTIONS` checklists in worklogs.
   - `EXECUTE` mode aligns with running approved Write Gate operations; ticket sync (R-29) runs in every mode.
